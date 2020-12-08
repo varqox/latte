@@ -4,10 +4,8 @@
 *.sublime-workspace
 .cache/
 backup
-bad/
 build/
 compile_commands.json
-good/
 km*.tgz
 km*/
 latc
@@ -21,4 +19,3 @@ src/ast/build.cc
 src/ByBnfc/Lexer.c
 src/ByBnfc/Parser.c
 src/persistent_map_tester
-warnings/
