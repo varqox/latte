@@ -1,0 +1,407 @@
+#include "src/ast/build.hh"
+#include "src/ast/ast.hh"
+#include "src/frontend/error.hh"
+#include "src/overloaded.hh"
+
+extern "C" {
+#include "src/ByBnfc/Absyn.h"
+#include "src/ByBnfc/Parser.h"
+} // extern "C"
+
+#include <charconv>
+#include <cstdio>
+#include <cstdlib>
+#include <cstring>
+#include <memory>
+#include <regex>
+#include <sys/mman.h>
+#include <unistd.h>
+
+static inline ast::SrcLoc fixed_sloc(int line, int column) noexcept {
+    // In BNFC's AST, columns are numbered from 1 in the first line, and from 0 in other lines
+    return {.line = line, .column = (line != 1) + column};
+}
+
+namespace ast {
+
+static_assert(std::is_same_v<::Integer, int_t>);
+
+struct Translator {
+    frontend::ErrorPrinter& errp;
+
+    TRANSLATE_TO_ENUM(AddOp, BinOp) {
+        CASE(Plus, ADD) {}
+        CASE(Minus, SUB) {}
+    }
+
+    TRANSLATE_TO_ENUM(MulOp, BinOp) {
+        CASE(Times, MUL) {}
+        CASE(Div, DIV) {}
+        CASE(Mod, MOD) {}
+    }
+
+    TRANSLATE_TO_ENUM(RelOp, BinOp) {
+        CASE(LTH) {}
+        CASE(LE) {}
+        CASE(GTH) {}
+        CASE(GE) {}
+        CASE(EQU, EQ) {}
+        CASE(NE) {}
+    }
+
+    TRANSLATE(Type) {
+        CASE(TInt) {}
+        CASE(TStr) {}
+        CASE(TBool) {}
+        CASE(TVoid) {}
+        CASE(TArray) {
+            .elem_type = std::make_unique<Type>(translate(x.type_)),
+        }
+        CASE(TClass) {
+            .name = x.ident_,
+        }
+    }
+
+    TRANSLATE(Expr) {
+        CASE(EVar) {
+            .name = x.ident_,
+        }
+        CASE(ELitInt) {
+            .str_val = x.intliteral_,
+        }
+        CASE(ELitTrue, ELitBool) {
+            .val = true,
+        }
+        CASE(ELitFalse, ELitBool) {
+            .val = false,
+        }
+        CASE(ESelf) {}
+        CASE(ENull) {}
+        CASE(ECastedNull) {
+            .type = [&] {
+                auto e = translate(x.expr_);
+                return std::visit(overloaded{
+                    [&](const Expr::EVar& var) {
+                        return Type {
+                            .val = Type::TClass{.name = var.name},
+                            .sloc = e.sloc,
+                        };
+                    },
+                    [&](const auto& /*unused*/) -> Type {
+                        errp.error(e.sloc, "invalid expression: expected class or array type as the cast type");
+                        __builtin_unreachable();
+                    },
+                }, e.val);
+            }(),
+        }
+        CASE(ECastedArrNull, ECastedNull) {
+            .type = [&] {
+                auto type = translate(x.type_);
+                auto sloc = type.sloc;
+                return Type {
+                    .val = Type::TArray{
+                        .elem_type = std::make_unique<Type>(std::move(type)),
+                    },
+                    .sloc = sloc,
+                };
+            }(),
+        }
+        CASE(ELitStr) {
+            .val = x.string_,
+        }
+        CASE(EArrElem) {
+            .arr = std::make_unique<Expr>(translate(x.expr_1)),
+            .index = std::make_unique<Expr>(translate(x.expr_2)),
+            .lbracket_sloc =
+                fixed_sloc(x.lbracket_->line_number, x.lbracket_->char_number),
+        }
+        CASE(ECallFunc) {
+            .func_name = x.ident_,
+            .args = std::make_unique<std::vector<Expr>>(translate(x.listexpr_)),
+            .lparen_sloc = fixed_sloc(x.lparen_->line_number, x.lparen_->char_number),
+        }
+        CASE(EField) {
+            .object = std::make_unique<Expr>(translate(x.expr_)),
+            .field_name = x.ident_,
+            .dot_sloc = fixed_sloc(x.dot_->line_number, x.dot_->char_number),
+        }
+        CASE(ECallMethod) {
+            .object = std::make_unique<Expr>(translate(x.expr_)),
+            .method_name = x.ident_,
+            .args = std::make_unique<std::vector<Expr>>(translate(x.listexpr_)),
+            .dot_sloc = fixed_sloc(x.dot_->line_number, x.dot_->char_number),
+            .lparen_sloc = fixed_sloc(x.lparen_->line_number, x.lparen_->char_number),
+        }
+        CASE(ENewArray) {
+            .elem_type = translate(x.type_),
+            .size = std::make_unique<Expr>(translate(x.expr_)),
+        }
+        CASE(ENewClass) {
+            .class_name = x.ident_,
+        }
+        CASE(ENeg, EUnaryOp) {
+            .val = std::make_unique<Expr>(translate(x.expr_)),
+            .op = UnaryOp::NEG,
+            .op_sloc = fixed_sloc(x.negop_->line_number, x.negop_->char_number),
+        }
+        CASE(ENot, EUnaryOp) {
+            .val = std::make_unique<Expr>(translate(x.expr_)),
+            .op = UnaryOp::NOT,
+            .op_sloc = fixed_sloc(x.notop_->line_number, x.notop_->char_number),
+        }
+        CASE(EMul, EBinOp) {
+            .left = std::make_unique<Expr>(translate(x.expr_1)),
+            .right = std::make_unique<Expr>(translate(x.expr_2)),
+            .op = translate(x.mulop_),
+            .op_sloc = fixed_sloc(x.mulop_->line_number, x.mulop_->char_number),
+        }
+        CASE(EAdd, EBinOp) {
+            .left = std::make_unique<Expr>(translate(x.expr_1)),
+            .right = std::make_unique<Expr>(translate(x.expr_2)),
+            .op = translate(x.addop_),
+            .op_sloc = fixed_sloc(x.addop_->line_number, x.addop_->char_number),
+        }
+        CASE(ERel, EBinOp) {
+            .left = std::make_unique<Expr>(translate(x.expr_1)),
+            .right = std::make_unique<Expr>(translate(x.expr_2)),
+            .op = translate(x.relop_),
+            .op_sloc = fixed_sloc(x.relop_->line_number, x.relop_->char_number),
+        }
+        CASE(EAnd, EBinOp) {
+            .left = std::make_unique<Expr>(translate(x.expr_1)),
+            .right = std::make_unique<Expr>(translate(x.expr_2)),
+            .op = BinOp::AND,
+            .op_sloc = fixed_sloc(x.andop_->line_number, x.andop_->char_number),
+        }
+        CASE(EOr, EBinOp) {
+            .left = std::make_unique<Expr>(translate(x.expr_1)),
+            .right = std::make_unique<Expr>(translate(x.expr_2)),
+            .op = BinOp::OR,
+            .op_sloc = fixed_sloc(x.orop_->line_number, x.orop_->char_number),
+        }
+    }
+    TRANSLATE_LIST(Expr);
+
+    TRANSLATE(DeclItem) {
+        CASE(DNoInit) {
+            .name = x.ident_,
+        }
+        CASE(DInit) {
+            .name = x.ident_,
+            .val = translate(x.expr_),
+            .ass_sloc = fixed_sloc(x.assop_->line_number, x.assop_->char_number),
+        }
+    }
+    TRANSLATE_LIST(DeclItem);
+
+    TRANSLATE(Stmt) {
+        CASE(SEmpty) {}
+        CASE(SBlock) {
+            .block = std::make_unique<Block>(translate(x.block_)),
+        }
+        CASE(SDecl) {
+            .type = translate(x.type_),
+            .items = translate(x.listdeclitem_),
+        }
+        CASE(SAss) {
+            .dest = translate(x.expr_1),
+            .val = translate(x.expr_2),
+            .ass_sloc = fixed_sloc(x.assop_->line_number, x.assop_->char_number),
+        }
+        CASE(SIncr) {
+            .dest = translate(x.expr_),
+            .op_sloc = fixed_sloc(x.incrop_->line_number, x.incrop_->char_number),
+        }
+        CASE(SDecr) {
+            .dest = translate(x.expr_),
+            .op_sloc = fixed_sloc(x.decrop_->line_number, x.decrop_->char_number),
+        }
+        CASE(SRet) {
+            .val = translate(x.expr_),
+        }
+        CASE(SVRet) {}
+        CASE(SExpr) {
+            .val = translate(x.expr_),
+        }
+        CASE(SWhile) {
+            .cond = translate(x.expr_),
+            .body = std::make_unique<Stmt>(translate(x.stmt_)),
+        }
+        CASE(SFor) {
+            .iter_type = translate(x.type_),
+            .iter_name = x.ident_,
+            .arr = translate(x.expr_),
+            .body = std::make_unique<Stmt>(translate(x.stmt_)),
+        }
+        CASE(SIf) {
+            .cond = translate(x.expr_),
+            .true_branch = std::make_unique<Stmt>(translate(x.stmt_)),
+            .false_branch = nullptr,
+        }
+        CASE(SIfElse, SIf) {
+            .cond = translate(x.expr_),
+            .true_branch = std::make_unique<Stmt>(translate(x.stmt_1)),
+            .false_branch = std::make_unique<Stmt>(translate(x.stmt_2)),
+        }
+    }
+    TRANSLATE_LIST(Stmt);
+
+    TRANSLATE_NO_CASE(Block) {
+        .stmts = translate(x.liststmt_),
+    }
+
+    TRANSLATE_NO_CASE(FnArg) {
+        .type = translate(x.type_),
+        .name = x.ident_,
+    }
+    TRANSLATE_LIST(FnArg);
+
+    TRANSLATE_NO_CASE(FieldDeclItem) {
+        .name = x.ident_,
+    }
+    TRANSLATE_LIST(FieldDeclItem);
+
+    TRANSLATE(ClassMemberDef) {
+        CASE(FieldDecl) {
+            .type = translate(x.type_),
+            .names = translate(x.listfielddeclitem_),
+        }
+        CASE(Method) {
+            .name = x.ident_,
+            .ret_type = translate(x.type_),
+            .args = translate(x.listfnarg_),
+            .body = translate(x.block_),
+        }
+    }
+    TRANSLATE_LIST(ClassMemberDef);
+
+    TRANSLATE(TopDef) {
+        CASE(FnDef) {
+            .name = x.ident_,
+            .ret_type = translate(x.type_),
+            .args = translate(x.listfnarg_),
+            .body = translate(x.block_),
+        }
+        CASE(ClassDef) {
+            .name = x.ident_,
+            .base_class_name = std::nullopt,
+            .members = translate(x.listclassmemberdef_),
+        }
+        CASE(ClassDefExtends, ClassDef) {
+            .name = x.ident_1,
+            .base_class_name = x.ident_2,
+            .members = translate(x.listclassmemberdef_),
+        }
+
+    }
+    TRANSLATE_LIST(TopDef);
+
+    TRANSLATE_NO_CASE(Program) {
+        .top_defs = translate(x.listtopdef_),
+    }
+};
+
+template<class Func>
+static std::string intercept_stderr(Func&& func) {
+    // Save current stderr
+    int fd = dup(STDERR_FILENO); // NOLINT(android-cloexec-dup)
+    if (fd < 0) {
+        fprintf(stderr, "dup() - %s\n", strerror(errno));
+        exit(1);
+    }
+    // Setup new stderr
+    int memfd = memfd_create("temporary stderr", MFD_CLOEXEC);
+    if (memfd < 0) {
+        fprintf(stderr, "memfd_create() - %s\n", strerror(errno));
+        exit(1);
+    }
+    if (dup2(memfd, STDERR_FILENO) < 0) {
+        fprintf(stderr, "dup2() - %s\n", strerror(errno));
+        exit(1);
+    }
+    auto restore_stderr = [&] {
+        // Restore stderr
+        if (dup2(fd, STDERR_FILENO) < 0) {
+            dprintf(fd, "dup2() - %s\n", strerror(errno));
+            exit(1);
+        }
+        if (close(fd)) {
+            fprintf(stderr, "close() - %s\n", strerror(errno));
+            exit(1);
+        }
+    };
+    try {
+        std::forward<Func>(func)();
+    } catch (...) {
+        restore_stderr();
+        if (close(memfd)) {
+            fprintf(stderr, "close() - %s\n", strerror(errno));
+            exit(1);
+        }
+        throw;
+    }
+    restore_stderr();
+    // Read the intercepted stderr
+    try {
+        off_t len = lseek(memfd, 0, SEEK_CUR);
+        if (len < 0) {
+            fprintf(stderr, "lseek() - %s\n", strerror(errno));
+            exit(1);
+        }
+        std::string res(len, '\0');
+        off_t pos = 0;
+        while (pos < len) {
+            ssize_t rc = pread(memfd, res.data() + pos, len - pos, pos);
+            if (rc < 0) {
+                fprintf(stderr, "pread() - %s\n", strerror(errno));
+                exit(1);
+            }
+            if (rc == 0) {
+                fprintf(stderr, "pread() == 0, but file is larger\n");
+                exit(1);
+            }
+            pos += rc;
+        }
+        return res;
+    } catch (...) {
+        if (close(memfd)) {
+            fprintf(stderr, "close() - %s\n", strerror(errno));
+            exit(1);
+        }
+        throw;
+    }
+}
+
+Program build(const std::string& file_contents, frontend::ErrorPrinter& errp) {
+    ::Program prog;
+    auto error_str = intercept_stderr([&] {
+        prog = psProgram(file_contents.data());
+    });
+    if (prog) {
+        return Translator{.errp = errp}.translate(prog);
+    }
+    // Parse and throw the error
+    std::smatch sm;
+    if (not std::regex_match(error_str, sm, std::regex{R"=(error: (\d+),(\d+): (.*)\n)="})) {
+        errp.error({}, error_str);
+        __builtin_unreachable();
+    }
+    auto parse_to = [&](const auto& str, auto& dest) {
+        auto [ptr, ec] = std::from_chars(str.data(), str.data() + str.size(), dest);
+        return !(ptr != str.data() + str.size() or ec != std::errc());
+    };
+    int line;
+    if (not parse_to(sm.str(1), line)) {
+        errp.error({}, error_str);
+        __builtin_unreachable();
+    }
+    int column;
+    if (not parse_to(sm.str(2), column)) {
+        errp.error({}, error_str);
+        __builtin_unreachable();
+    }
+    errp.error(fixed_sloc(line, column), sm.str(3).data());
+    __builtin_unreachable();
+}
+
+} // namespace ast

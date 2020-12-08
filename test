@@ -1,0 +1,7 @@
+#!/bin/bash
+make && for i in $(find mrjp-tests/ -type f | grep -P '\.lat$' | sort); do echo $i; ./latc_x86_64 "$i" 2> /dev/null || echo -e "\033[1;31m$i <\033[m"; done
+make && for i in $(find lattests/ -type f | grep -P '\.lat$' | sort); do echo $i; ./latc_x86_64 "$i" 2> /dev/null || echo -e "\033[1;31m$i <\033[m"; done
+make && for i in $(find good/ -type f | grep -P '\.lat$' | sort); do echo $i; ./latc_x86_64 "$i" 2> /dev/null || echo -e "\033[1;31m$i <\033[m"; done 
+make && for i in $(find warnings/ -type f | grep -P '\.lat$' | sort); do rm /tmp/xxx; ./latc_x86_64 $i 2> /tmp/xxx; grep ': .......warning: ' /tmp/xxx -q && echo $i || echo -e "\033[1;31m$i <\033[m"; done
+make && for i in $(find bad/ -type f | grep -P '\.lat$' | sort); do rm /tmp/xxx; ./latc_x86_64 $i 2> /tmp/xxx; grep ': .......error: ' /tmp/xxx -q || echo -e "\033[1;31m$i <\033[m"; done
+

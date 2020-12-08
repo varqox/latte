@@ -1,0 +1,165 @@
+-- programs ------------------------------------------------
+
+-- token UIdent (upper (letter | digit | '_')*) ;
+
+entrypoints     Program ;
+
+Program.        Program ::= [TopDef] ;
+
+FnDef.          TopDef ::= Type Ident "(" [FnArg] ")" Block ;
+
+ClassDef.       TopDef ::= "class" Ident "{" [ClassMemberDef] "}" ;
+ClassDefExtends.TopDef ::= "class" Ident "extends" Ident "{" [ClassMemberDef] "}" ;
+
+separator nonempty TopDef "" ;
+
+FieldDecl.      ClassMemberDef ::= Type [FieldDeclItem] ";" ;
+
+Method.         ClassMemberDef ::= Type Ident "(" [FnArg] ")" Block ;
+
+separator       ClassMemberDef "" ;
+
+FieldDeclItem.  FieldDeclItem ::= Ident ;
+
+separator nonempty FieldDeclItem "," ;
+
+FnArg.          FnArg ::= Type Ident;
+
+separator       FnArg "," ;
+
+-- statements ----------------------------------------------
+
+Block.          Block ::= "{" [Stmt] "}" ;
+
+separator       Stmt "" ;
+
+SEmpty.         Stmt ::= ";" ;
+
+SBlock.         Stmt ::= Block ;
+
+SDecl.          Stmt ::= Type [DeclItem] ";" ;
+
+SAss.           Stmt ::= Expr AssOp Expr ";" ;
+
+SIncr.          Stmt ::= Expr IncrOp ";" ;
+
+SDecr.          Stmt ::= Expr DecrOp ";" ;
+
+SRet.           Stmt ::= "return" Expr ";" ;
+
+SVRet.          Stmt ::= "return" ";" ;
+
+SExpr.          Stmt ::= Expr  ";" ;
+
+SWhile.         Stmt ::= "while" "(" Expr ")" Stmt ;
+
+SFor.           Stmt ::= "for" "(" Type Ident ":" Expr ")" Stmt ;
+
+SIf.            Stmt ::= "if" "(" Expr ")" Stmt ;
+
+SIfElse.        Stmt ::= "if" "(" Expr ")" Stmt "else" Stmt  ;
+
+DNoInit.        DeclItem ::= Ident ;
+
+DInit.          DeclItem ::= Ident AssOp Expr ;
+
+separator nonempty DeclItem "," ;
+
+-- Expressions ---------------------------------------------
+
+EVar.           Expr7 ::= Ident ;
+
+token IntLiteral (digit+) ;
+
+ELitInt.        Expr7 ::= IntLiteral ;
+
+ELitTrue.       Expr7 ::= "true" ;
+
+ELitFalse.      Expr7 ::= "false" ;
+
+ESelf.          Expr7 ::= "self" ;
+
+ENull.          Expr7 ::= "null" ;
+
+ECastedNull.    Expr7 ::= "(" Expr ")" "null" ;
+
+ECastedArrNull. Expr7 ::= "(" Type "[]" ")" "null" ;
+
+ELitStr.        Expr7 ::= String ;
+
+EArrElem.       Expr7 ::= Expr7 LBracket Expr "]" ;
+
+ECallFunc.      Expr7 ::= Ident LParen [Expr] ")" ;
+
+EField.         Expr7 ::= Expr7 Dot Ident ;
+
+ECallMethod.    Expr7 ::= Expr7 Dot Ident LParen [Expr] ")";
+
+ENewArray.      Expr6 ::= "new" Type "[" Expr "]" ;
+
+ENewClass.      Expr6 ::= "new" Ident ;
+
+ENeg.           Expr5 ::= NegOp Expr5 ;
+
+ENot.           Expr5 ::= NotOp Expr5 ;
+
+EMul.           Expr4 ::= Expr4 MulOp Expr5 ;
+
+EAdd.           Expr3 ::= Expr3 AddOp Expr4 ;
+
+ERel.           Expr2 ::= Expr2 RelOp Expr3 ;
+
+EAnd.           Expr1 ::= Expr2 AndOp Expr1 ;
+
+EOr.            Expr ::= Expr1 OrOp Expr ;
+
+coercions       Expr 7 ;
+
+separator       Expr "," ;
+
+-- Types ---------------------------------------------------
+
+TInt.           Type ::= "int" ;
+TStr.           Type ::= "string" ;
+TBool.          Type ::= "boolean" ;
+TVoid.          Type ::= "void" ;
+TArray.         Type ::= Type "[]";
+TClass.         Type ::= Ident;
+
+-- symbols defined separately to retain their source location
+
+AssOp.          AssOp ::= "=" ;
+IncrOp.         IncrOp ::= "++" ;
+DecrOp.         DecrOp ::= "--" ;
+LBracket.       LBracket ::= "[" ;
+LParen.         LParen ::= "(" ;
+Dot.            Dot ::= "." ;
+NegOp.          NegOp ::= "-" ;
+NotOp.          NotOp ::= "!" ;
+AndOp.          AndOp ::= "&&" ;
+OrOp.           OrOp ::= "||" ;
+
+-- operators -----------------------------------------------
+
+Plus.           AddOp ::= "+" ;
+Minus.          AddOp ::= "-" ;
+
+Times.          MulOp ::= "*" ;
+Div.            MulOp ::= "/" ;
+Mod.            MulOp ::= "%" ;
+
+LTH.            RelOp ::= "<" ;
+LE.             RelOp ::= "<=" ;
+GTH.            RelOp ::= ">" ;
+GE.             RelOp ::= ">=" ;
+EQU.            RelOp ::= "==" ;
+NE.             RelOp ::= "!=" ;
+
+-- comments ------------------------------------------------
+
+comment         "#" ;
+
+comment         "//" ;
+
+comment         "/*" "*/" ;
+
