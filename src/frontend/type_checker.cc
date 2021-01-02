@@ -7,6 +7,7 @@
 #include <cassert>
 #include <cstddef>
 #include <limits>
+#include <memory>
 #include <optional>
 #include <type_traits>
 #include <utility>
@@ -342,8 +343,8 @@ class TypeChecker {
                     }
                     // Then for built-in functions
                     if (not ftype) {
-                        auto it = global_symbols.builtin_functions.find(fcall.func_name);
-                        if (it != global_symbols.builtin_functions.end()) {
+                        auto it = GlobalSymbols::builtin_functions.find(fcall.func_name);
+                        if (it != GlobalSymbols::builtin_functions.end()) {
                             ftype = &it->second;
                             fcall.kind = ast::Expr::ECallFunc::Kind::BUILTIN;
                         }
@@ -611,6 +612,21 @@ class TypeChecker {
     }
 
     void process(ast::Stmt& stmt, Context& context) {
+        auto enclose_in_block = [](std::unique_ptr<ast::Stmt> stmt) {
+            auto sloc = stmt->sloc;
+            std::vector<ast::Stmt> stmts;
+            stmts.emplace_back(std::move(*stmt));
+            return std::make_unique<ast::Stmt>(ast::Stmt{
+                .val =
+                    ast::Stmt::SBlock{
+                        .block = std::make_unique<ast::Block>(ast::Block{
+                            .stmts = std::move(stmts),
+                            .sloc = sloc,
+                        }),
+                    },
+                .sloc = sloc,
+            });
+        };
         std::visit(
             overloaded{
                 [&](ast::Stmt::SEmpty& /*unused*/) {},
@@ -704,6 +720,8 @@ class TypeChecker {
                         .func_return_type = context.func_return_type,
                     };
                     process(*swhile.body, body_context);
+                    // Enclose body in a Block to simplify scoping -- scope == Block
+                    swhile.body = enclose_in_block(std::move(swhile.body));
                 },
                 [&](ast::Stmt::SFor& sfor) {
                     auto body_context = Context{
@@ -737,6 +755,8 @@ class TypeChecker {
                     } else {
                         process(*sfor.body, body_context);
                     }
+                    // Enclose body in a Block to simplify scoping -- scope == Block
+                    sfor.body = enclose_in_block(std::move(sfor.body));
                 },
                 [&](ast::Stmt::SIf& sif) {
                     process(sif.cond, context);
@@ -745,7 +765,8 @@ class TypeChecker {
                             sif.cond.sloc, "if condition has to be of type `",
                             as_str(ast::type_bool), "`, not `", as_str(sif.cond.type), '`');
                     }
-                    for (auto* branch : {sif.true_branch.get(), sif.false_branch.get()}) {
+                    for (auto* branch_ptr : {&sif.true_branch, &sif.false_branch}) {
+                        auto& branch = *branch_ptr;
                         if (not branch) {
                             continue;
                         }
@@ -757,6 +778,8 @@ class TypeChecker {
                             .func_return_type = context.func_return_type,
                         };
                         process(*branch, branch_context);
+                        // Enclose body in a Block to simplify scoping -- scope == Block
+                        branch = enclose_in_block(std::move(branch));
                     }
                 },
             },

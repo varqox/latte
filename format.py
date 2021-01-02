@@ -34,6 +34,7 @@ def laby_sources(srcdir):
         'src/ast/',
         'src/backend/',
         'src/frontend/',
+        'src/ir/',
     ], ['c', 'cc', 'h', 'hh'], [
     ]))
 

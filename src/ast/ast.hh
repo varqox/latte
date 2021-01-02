@@ -1,6 +1,7 @@
 #pragma once
 
 #include "src/concat.hh"
+#include "src/defs.hh"
 #include "src/overloaded.hh"
 #include "src/persistent_map.hh"
 
@@ -17,7 +18,6 @@
 namespace ast {
 
 using Ident = std::string;
-using int_t = int32_t;
 
 struct SrcLoc {
     int line; // starts at 1
@@ -156,6 +156,38 @@ inline bool operator!=(const Type::TClass& a, const Type::TClass& b) noexcept {
 inline bool operator!=(const Type::TFun& a, const Type::TFun& b) noexcept { return !(a == b); }
 inline bool operator!=(const Type& a, const Type& b) noexcept { return !(a == b); }
 
+inline bool operator<(const Type::TNull& /*a*/, const Type::TNull& /*b*/) noexcept {
+    return false;
+}
+inline bool operator<(const Type::TInt& /*a*/, const Type::TInt& /*b*/) noexcept {
+    return false;
+}
+inline bool operator<(const Type::TStr& /*a*/, const Type::TStr& /*b*/) noexcept {
+    return false;
+}
+inline bool operator<(const Type::TBool& /*a*/, const Type::TBool& /*b*/) noexcept {
+    return false;
+}
+inline bool operator<(const Type::TVoid& /*a*/, const Type::TVoid& /*b*/) noexcept {
+    return false;
+}
+inline bool operator<(const Type& a, const Type& b) noexcept;
+inline bool operator<(const Type::TArray& a, const Type::TArray& b) noexcept {
+    return *a.elem_type < *b.elem_type;
+}
+inline bool operator<(const Type::TClass& a, const Type::TClass& b) noexcept {
+    return a.name < b.name;
+}
+inline bool operator<(const Type::TFun& a, const Type::TFun& b) noexcept {
+    if (*a.ret_type == *b.ret_type) {
+        return std::lexicographical_compare(
+            a.arg_types->begin(), a.arg_types->end(), b.arg_types->begin(),
+            b.arg_types->end());
+    }
+    return *a.ret_type < *b.ret_type;
+}
+inline bool operator<(const Type& a, const Type& b) noexcept { return a.val < b.val; }
+
 struct GlobalSymbols {
     struct Function {
         ast::Type::TFun type;
@@ -178,6 +210,7 @@ struct GlobalSymbols {
         std::optional<ast::Ident> base_class;
         PersistentMap<ast::Ident, Field> fields;
         PersistentMap<ast::Ident, Method> methods;
+        ast::Type type;
         ast::SrcLoc def_sloc;
         struct {
             size_t in;
@@ -185,7 +218,40 @@ struct GlobalSymbols {
         } pre_post_order;
     };
 
-    std::map<ast::Ident, ast::Type::TFun> builtin_functions;
+    static inline const std::map<ast::Ident, ast::Type::TFun> builtin_functions = [] {
+        std::map<ast::Ident, ast::Type::TFun> res;
+        res.try_emplace(
+            "printInt",
+            Type::TFun{
+                .ret_type = std::make_unique<Type>(ast::type_void),
+                .arg_types = std::make_unique<std::vector<Type>>(1, ast::type_int),
+            });
+        res.try_emplace(
+            "printString",
+            Type::TFun{
+                .ret_type = std::make_unique<Type>(ast::type_void),
+                .arg_types = std::make_unique<std::vector<Type>>(1, ast::type_str),
+            });
+        res.try_emplace(
+            "error",
+            Type::TFun{
+                .ret_type = std::make_unique<Type>(ast::type_void),
+                .arg_types = std::make_unique<std::vector<Type>>(),
+            });
+        res.try_emplace(
+            "readInt",
+            Type::TFun{
+                .ret_type = std::make_unique<Type>(ast::type_int),
+                .arg_types = std::make_unique<std::vector<Type>>(),
+            });
+        res.try_emplace(
+            "readString",
+            Type::TFun{
+                .ret_type = std::make_unique<Type>(ast::type_str),
+                .arg_types = std::make_unique<std::vector<Type>>(),
+            });
+        return res;
+    }();
     std::map<ast::Ident, Function> functions;
     std::map<ast::Ident, Class> classes;
 
@@ -203,6 +269,11 @@ enum class Reachability {
     PARTIAL, // some code, but not all will be executed in the current subtree
     UNREACHABLE, // no code of the current subtree will ever be executed (set from outside
                  // subtree)
+};
+
+struct Null {
+    friend bool operator==(Null /*a*/, Null /*b*/) noexcept { return true; }
+    friend bool operator!=(Null /*a*/, Null /*b*/) noexcept { return false; }
 };
 
 struct Expr {
@@ -287,7 +358,7 @@ struct Expr {
         val;
     SrcLoc sloc;
     Type type = type_null;
-    std::optional<std::variant<int_t, std::string, bool, std::nullptr_t>> comptime_val{};
+    std::optional<std::variant<int_t, bool, std::string, Null>> comptime_val{};
     bool can_be_lvalue = false;
     // It is not propagated down the tree
     Reachability reachability = Reachability::REACHABLE;

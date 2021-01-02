@@ -13,10 +13,10 @@ class StaticAnalyzer {
     frontend::ErrorPrinter& errp;
 
     // @p str consists only of digits and @p negative holds the sign
-    ast::int_t parse_int_literal(const std::string& str, bool negative, SrcLoc sloc) {
+    int_t parse_int_literal(const std::string& str, bool negative, SrcLoc sloc) {
         assert(not str.empty());
         assert(std::all_of(str.begin(), str.end(), ::isdigit));
-        ast::int_t val = negative ? '0' - str[0] : str[0] - '0';
+        int_t val = negative ? '0' - str[0] : str[0] - '0';
         for (size_t i = 1; i < str.size(); ++i) {
             if (__builtin_mul_overflow(val, 10, &val) or
                 __builtin_add_overflow(val, (negative ? '0' - str[i] : str[i] - '0'), &val))
@@ -66,11 +66,11 @@ class StaticAnalyzer {
                     return ControlFlow{.can_go_through = true};
                 },
                 [&](ast::Expr::ENull& /*unused*/) {
-                    expr.comptime_val = nullptr;
+                    expr.comptime_val = ast::Null{};
                     return ControlFlow{.can_go_through = true};
                 },
                 [&](ast::Expr::ECastedNull& /*unused*/) {
-                    expr.comptime_val = nullptr;
+                    expr.comptime_val = ast::Null{};
                     return ControlFlow{.can_go_through = true};
                 },
                 [&](ast::Expr::ELitStr& lit) {
@@ -80,12 +80,12 @@ class StaticAnalyzer {
                 [&](ast::Expr::EArrElem& arr_elem) {
                     auto cf = analyze(*arr_elem.arr, {});
                     if (arr_elem.arr->comptime_val) {
-                        (void)std::get<std::nullptr_t>(*arr_elem.arr->comptime_val); // assert
+                        (void)std::get<ast::Null>(*arr_elem.arr->comptime_val); // assert
                         errp.warning(arr_elem.lbracket_sloc, "subscripting a null array");
                     }
                     cf &= analyze(*arr_elem.index, cf);
                     if (arr_elem.index->comptime_val) {
-                        auto idx = std::get<ast::int_t>(*arr_elem.index->comptime_val);
+                        auto idx = std::get<int_t>(*arr_elem.index->comptime_val);
                         if (idx < 0) {
                             errp.warning(
                                 arr_elem.lbracket_sloc, "array index ", idx,
@@ -127,7 +127,7 @@ class StaticAnalyzer {
                         expr.reachability = ast::Reachability::PARTIAL;
                     }
                     if (field.object->comptime_val) {
-                        (void)std::get<std::nullptr_t>(*field.object->comptime_val); // assert
+                        (void)std::get<ast::Null>(*field.object->comptime_val); // assert
                         errp.warning(field.dot_sloc, "accessing field of a null object")
                             .note(
                                 field.object->sloc,
@@ -139,7 +139,7 @@ class StaticAnalyzer {
                 [&](ast::Expr::ECallMethod& mcall) {
                     auto cf = analyze(*mcall.object, {});
                     if (mcall.object->comptime_val) {
-                        (void)std::get<std::nullptr_t>(*mcall.object->comptime_val); // assert
+                        (void)std::get<ast::Null>(*mcall.object->comptime_val); // assert
                         errp.warning(mcall.dot_sloc, "calling method on a null object")
                             .note(
                                 mcall.object->sloc,
@@ -161,7 +161,7 @@ class StaticAnalyzer {
                 [&](ast::Expr::ENewArray& na) {
                     auto cf = analyze(*na.size, {});
                     if (na.size->comptime_val) {
-                        auto size = std::get<ast::int_t>(*na.size->comptime_val);
+                        auto size = std::get<int_t>(*na.size->comptime_val);
                         if (size < 0) {
                             errp.warning(na.size->sloc, "negative array size: ", size);
                         }
@@ -189,8 +189,8 @@ class StaticAnalyzer {
                             cf = analyze(val_expr, cf);
                             if (val_expr.comptime_val) {
                                 auto expr_comptime_val =
-                                    std::get<ast::int_t>(*val_expr.comptime_val);
-                                ast::int_t val{};
+                                    std::get<int_t>(*val_expr.comptime_val);
+                                int_t val{};
                                 if (__builtin_sub_overflow(0, expr_comptime_val, &val)) {
                                     errp.error(
                                         uop.op_sloc, "integer overflow while negating value: ",
@@ -227,9 +227,9 @@ class StaticAnalyzer {
                         if (not lexpr.comptime_val or not rexpr.comptime_val) {
                             return;
                         }
-                        ast::int_t res{};
-                        auto a = std::get<ast::int_t>(*lexpr.comptime_val);
-                        auto b = std::get<ast::int_t>(*rexpr.comptime_val);
+                        int_t res{};
+                        auto a = std::get<int_t>(*lexpr.comptime_val);
+                        auto b = std::get<int_t>(*rexpr.comptime_val);
                         if (do_op(a, b, &res)) {
                             errp.error(
                                 bop.op_sloc, error_description, " in expression ", a, ' ',
@@ -243,8 +243,8 @@ class StaticAnalyzer {
                             assert(rexpr.type == ast::type_int);
                             if (lexpr.comptime_val and rexpr.comptime_val) {
                                 expr.comptime_val =
-                                    op(std::get<ast::int_t>(*lexpr.comptime_val),
-                                       std::get<ast::int_t>(*rexpr.comptime_val));
+                                    op(std::get<int_t>(*lexpr.comptime_val),
+                                       std::get<int_t>(*rexpr.comptime_val));
                             }
                         } else if (lexpr.comptime_val and rexpr.comptime_val) {
                             assert(lexpr.type == ast::type_str);
@@ -261,10 +261,9 @@ class StaticAnalyzer {
                         cf &= analyze(rexpr, cf);
                         if (lexpr.type == ast::type_int) {
                             assert(rexpr.type == ast::type_int);
-                            do_comptime_int_op(
-                                '+', [](ast::int_t a, ast::int_t b, ast::int_t* res) {
-                                    return __builtin_add_overflow(a, b, res);
-                                });
+                            do_comptime_int_op('+', [](int_t a, int_t b, int_t* res) {
+                                return __builtin_add_overflow(a, b, res);
+                            });
                         } else if (lexpr.comptime_val and rexpr.comptime_val) {
                             assert(lexpr.type == ast::type_str);
                             assert(rexpr.type == ast::type_str);
@@ -275,53 +274,47 @@ class StaticAnalyzer {
                     case ast::BinOp::SUB: {
                         cf &= analyze(lexpr, cf);
                         cf &= analyze(rexpr, cf);
-                        do_comptime_int_op(
-                            '-', [](ast::int_t a, ast::int_t b, ast::int_t* res) {
-                                return __builtin_sub_overflow(a, b, res);
-                            });
+                        do_comptime_int_op('-', [](int_t a, int_t b, int_t* res) {
+                            return __builtin_sub_overflow(a, b, res);
+                        });
                     } break;
                     case ast::BinOp::MUL: {
                         cf &= analyze(lexpr, cf);
                         cf &= analyze(rexpr, cf);
-                        do_comptime_int_op(
-                            '*', [](ast::int_t a, ast::int_t b, ast::int_t* res) {
-                                return __builtin_mul_overflow(a, b, res);
-                            });
+                        do_comptime_int_op('*', [](int_t a, int_t b, int_t* res) {
+                            return __builtin_mul_overflow(a, b, res);
+                        });
                     } break;
                     case ast::BinOp::DIV: {
                         cf &= analyze(lexpr, cf);
                         cf &= analyze(rexpr, cf);
-                        do_comptime_int_op(
-                            '/', [&](ast::int_t a, ast::int_t b, ast::int_t* res) {
-                                if (b == 0) {
-                                    errp.error(
-                                        bop.op_sloc, "division by 0 in expression ", a, " / ",
-                                        b);
-                                    cf.can_go_through = false;
-                                }
-                                if (a == std::numeric_limits<decltype(a)>::min() and b == -1) {
-                                    return true;
-                                }
-                                *res = a / b;
-                                return false;
-                            });
+                        do_comptime_int_op('/', [&](int_t a, int_t b, int_t* res) {
+                            if (b == 0) {
+                                errp.error(
+                                    bop.op_sloc, "division by 0 in expression ", a, " / ", b);
+                                cf.can_go_through = false;
+                            }
+                            if (a == std::numeric_limits<decltype(a)>::min() and b == -1) {
+                                return true;
+                            }
+                            *res = a / b;
+                            return false;
+                        });
                     } break;
                     case ast::BinOp::MOD: {
                         cf &= analyze(lexpr, cf);
                         cf &= analyze(rexpr, cf);
-                        do_comptime_int_op(
-                            '%', [&](ast::int_t a, ast::int_t b, ast::int_t* res) {
-                                if (b == 0) {
-                                    errp.error(
-                                        bop.op_sloc, "division by 0 in expression ", a, " % ",
-                                        b);
-                                }
-                                if (a == std::numeric_limits<decltype(a)>::min() and b == -1) {
-                                    return true;
-                                }
-                                *res = a % b;
-                                return false;
-                            });
+                        do_comptime_int_op('%', [&](int_t a, int_t b, int_t* res) {
+                            if (b == 0) {
+                                errp.error(
+                                    bop.op_sloc, "division by 0 in expression ", a, " % ", b);
+                            }
+                            if (a == std::numeric_limits<decltype(a)>::min() and b == -1) {
+                                return true;
+                            }
+                            *res = a % b;
+                            return false;
+                        });
                     } break;
                     case ast::BinOp::LTH: {
                         cf &= analyze(lexpr, cf);
@@ -388,7 +381,14 @@ class StaticAnalyzer {
                             if (rexpr.comptime_val) {
                                 bool rexpr_val = std::get<bool>(*rexpr.comptime_val);
                                 if (!rexpr_val) {
-                                    expr.comptime_val = false;
+                                    if (lexpr.comptime_val) {
+                                        assert(std::get<bool>(*lexpr.comptime_val));
+                                        expr.comptime_val = false;
+                                    } else {
+                                        // Cannot set to false, as lexpr has to be fully
+                                        // evaluated
+                                        expr.comptime_val = std::nullopt;
+                                    }
                                 } else if (lexpr.comptime_val) {
                                     assert(std::get<bool>(*lexpr.comptime_val));
                                     expr.comptime_val = true;
@@ -416,7 +416,14 @@ class StaticAnalyzer {
                             if (rexpr.comptime_val) {
                                 bool rexpr_val = std::get<bool>(*rexpr.comptime_val);
                                 if (rexpr_val) {
-                                    expr.comptime_val = true;
+                                    if (lexpr.comptime_val) {
+                                        assert(!std::get<bool>(*lexpr.comptime_val));
+                                        expr.comptime_val = true;
+                                    } else {
+                                        // Cannot set to true, as lexpr has to be fully
+                                        // evaluated
+                                        expr.comptime_val = std::nullopt;
+                                    }
                                 } else if (lexpr.comptime_val) {
                                     assert(!std::get<bool>(*lexpr.comptime_val));
                                     expr.comptime_val = false;
@@ -723,7 +730,8 @@ public:
                         // Nothing to analyze with arguments
                         analyze_func(fn.ret_type, fn.body, top_def.sloc);
                     },
-                    [&](ast::TopDef::ClassDef& cl) { analyze(cl); }},
+                    [&](ast::TopDef::ClassDef& cl) { analyze(cl); },
+                },
                 top_def.val);
         }
     }

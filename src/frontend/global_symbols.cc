@@ -80,7 +80,7 @@ class GlobalSymbolsCollector {
         std::visit(
             overloaded{
                 [&](const ast::TopDef::FnDef& fndef) {
-                    if (globsym.builtin_functions.count(fndef.name) != 0) {
+                    if (GlobalSymbols::builtin_functions.count(fndef.name) != 0) {
                         errp.error(
                             top_def.sloc,
                             "cannot define function having the same name as the predefined "
@@ -108,6 +108,10 @@ class GlobalSymbolsCollector {
                             .base_class = class_def.base_class_name,
                             .fields = {},
                             .methods = {},
+                            .type =
+                                ast::Type{
+                                    .val = ast::Type::TClass{.name = class_def.name},
+                                    .sloc = top_def.sloc},
                             .def_sloc = top_def.sloc,
                             .pre_post_order = {.in = 0, .out = 0}, // Will be filled later
                         });
@@ -268,36 +272,6 @@ public:
     : errp{errp} {}
 
     GlobalSymbols run(const ast::Program& prog) && {
-        globsym.builtin_functions.try_emplace(
-            "printInt",
-            Type::TFun{
-                .ret_type = std::make_unique<Type>(ast::type_void),
-                .arg_types = std::make_unique<std::vector<Type>>(1, ast::type_int),
-            });
-        globsym.builtin_functions.try_emplace(
-            "printString",
-            Type::TFun{
-                .ret_type = std::make_unique<Type>(ast::type_void),
-                .arg_types = std::make_unique<std::vector<Type>>(1, ast::type_str),
-            });
-        globsym.builtin_functions.try_emplace(
-            "error",
-            Type::TFun{
-                .ret_type = std::make_unique<Type>(ast::type_void),
-                .arg_types = std::make_unique<std::vector<Type>>(),
-            });
-        globsym.builtin_functions.try_emplace(
-            "readInt",
-            Type::TFun{
-                .ret_type = std::make_unique<Type>(ast::type_int),
-                .arg_types = std::make_unique<std::vector<Type>>(),
-            });
-        globsym.builtin_functions.try_emplace(
-            "readString",
-            Type::TFun{
-                .ret_type = std::make_unique<Type>(ast::type_str),
-                .arg_types = std::make_unique<std::vector<Type>>(),
-            });
         for (auto& top_def : prog.top_defs) {
             shallow_collect(top_def);
         }

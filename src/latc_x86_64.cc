@@ -5,6 +5,7 @@
 #include "src/frontend/global_symbols.hh"
 #include "src/frontend/static_analyzer.hh"
 #include "src/frontend/type_checker.hh"
+#include "src/ir/ast_to_ir.hh"
 
 #include <cerrno>
 #include <cstddef>
@@ -71,6 +72,7 @@ int main(int argc, char** argv) {
         auto global_symbols = frontend::collect_global_symbols(prog_ast, error_printer);
         frontend::check_and_annotate_types(prog_ast, global_symbols, error_printer);
         frontend::static_analyze(prog_ast, error_printer);
+        auto ir_prog = ir::translate_ast_to_ir(prog_ast, global_symbols);
         std::cerr << "OK\n" << error_printer.get_all_diagnostics();
         return 0;
     } catch (const frontend::ErrorPrinter::ErrorOccurred&) {

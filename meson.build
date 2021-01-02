@@ -66,8 +66,10 @@ ast_build = declare_dependency(
 latc_x86_64 = executable('latc_x86_64',
     sources : [
         'src/frontend/global_symbols.cc',
-        'src/frontend/type_checker.cc',
         'src/frontend/static_analyzer.cc',
+        'src/frontend/type_checker.cc',
+        'src/ir/ast_to_ir.cc',
+        'src/ir/ir_printer.cc',
         'src/latc_x86_64.cc',
     ],
     dependencies : [
