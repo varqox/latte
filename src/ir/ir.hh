@@ -1,5 +1,6 @@
 #pragma once
 
+#include "src/concat.hh"
 #include "src/define_cmp_operators_by_field.hh"
 #include "src/defs.hh"
 #include "src/overloaded.hh"
@@ -19,6 +20,10 @@ struct Label {
     DEFINE_CMP_OPERATORS_BY_FIELD(Label, id)
 };
 
+inline std::string to_str(const Label& label) {
+    return concat(".L", label.id);
+}
+
 struct Var {
     size_t id;
     DEFINE_CMP_OPERATORS_BY_FIELD(Var, id)
@@ -34,7 +39,11 @@ struct FnName {
     DEFINE_CMP_OPERATORS_BY_FIELD(FnName, mangled_name)
 };
 
-inline const FnName builtin_zalloc = FnName{.mangled_name = "@@zalloc"}; // (PTR) -> PTR
+inline std::string to_str(const FnName& fname) {
+    return concat("f.", fname.mangled_name);
+}
+
+inline const FnName builtin_zalloc = FnName{.mangled_name = "@@zalloc"}; // (INT) -> PTR
 inline const FnName builtin_free = FnName{.mangled_name = "@@free"}; // (PTR) -> void
 inline const FnName builtin_make_string =
     FnName{.mangled_name = "@@make_string"}; // (PTR) -> PTR
@@ -56,11 +65,20 @@ inline const FnName builtin_destruct_string =
     FnName{.mangled_name = "@@destruct_string"}; // (PTR) -> void
 inline const FnName builtin_inc_ref_count =
     FnName{.mangled_name = "@@inc_ref_count"}; // (PTR) -> void
+inline const FnName builtin_error = FnName{.mangled_name = "@error"}; // () -> void
+inline const FnName builtin_printInt = FnName{.mangled_name = "@printInt"}; // (INT) -> void
+inline const FnName builtin_printString = FnName{.mangled_name = "@printString"}; // (PTR) -> void
+inline const FnName builtin_readInt = FnName{.mangled_name = "@readInt"}; // () -> INT
+inline const FnName builtin_readString = FnName{.mangled_name = "@readString"}; // () -> INT
 
 struct VTableName {
     ClassName its_class;
     DEFINE_CMP_OPERATORS_BY_FIELD(VTableName, its_class)
 };
+
+inline std::string to_str(const VTableName& vt_name) {
+    return concat("vt.", vt_name.its_class.mangled_name);
+}
 
 struct VTable {
     VTableName name;
@@ -71,6 +89,10 @@ struct StringConstantName {
     size_t id;
     DEFINE_CMP_OPERATORS_BY_FIELD(StringConstantName, id)
 };
+
+inline std::string to_str(const StringConstantName& sname) {
+    return concat("s.", sname.id);
+}
 
 struct StringConstant {
     StringConstantName name;
@@ -89,10 +111,19 @@ struct Null {
 using Value = std::variant<Var, int_t, bool, Null, StringConstantName, VTableName>;
 
 enum class Type {
-    INT,
     BOOL,
+    INT,
     PTR,
 };
+
+constexpr const char* to_str(Type type) noexcept {
+    switch (type) {
+    case ir::Type::BOOL: return "BOOL";
+    case ir::Type::INT: return "INT";
+    case ir::Type::PTR: return "PTR";
+    }
+    __builtin_unreachable();
+}
 
 enum class UnaryOp {
     NEG,
@@ -158,17 +189,22 @@ struct IConstLoad {
 };
 struct IStore {
     MemLoc loc;
+    Type type;
     Value val;
+};
+struct CallArg {
+    Value val;
+    Type type;
 };
 struct ICall {
     Var var;
     Type type;
     std::variant<FnName, ConstMemLoc> func;
-    std::vector<Value> args;
+    std::vector<CallArg> args;
 };
 struct IVCall {
     std::variant<FnName, ConstMemLoc> func;
-    std::vector<Value> args;
+    std::vector<CallArg> args;
 };
 struct IGoto {
     Label target;

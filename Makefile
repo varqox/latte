@@ -36,6 +36,7 @@ INTERNAL_EXTRA_CXX_FLAGS := -I. -Wno-extern-c-compat
 endef
 LATC_SOURCES := $(BNFC_SRCS) \
 	src/ast/build.cc \
+	src/backend/x86_64.cc \
 	src/frontend/global_symbols.cc \
 	src/frontend/static_analyzer.cc \
 	src/frontend/type_checker.cc \

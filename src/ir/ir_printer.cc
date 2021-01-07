@@ -12,14 +12,14 @@
 namespace ir {
 
 std::ostream& operator<<(std::ostream& os, const Label& lname) {
-    return os << ".L" << lname.id;
+    return os << to_str(lname);
 }
 std::ostream& operator<<(std::ostream& os, const Var& vname) { return os << 'v' << vname.id; }
 std::ostream& operator<<(std::ostream& os, const FnName& fname) {
-    return os << "f." << fname.mangled_name;
+    return os << to_str(fname);
 }
 std::ostream& operator<<(std::ostream& os, const VTableName& vt_name) {
-    return os << "vt." << vt_name.its_class.mangled_name;
+    return os << to_str(vt_name);
 }
 std::ostream& operator<<(std::ostream& os, const VTable& vt) {
     os << vt.name << " [\n";
@@ -29,7 +29,7 @@ std::ostream& operator<<(std::ostream& os, const VTable& vt) {
     return os << ']';
 }
 std::ostream& operator<<(std::ostream& os, const StringConstantName& sname) {
-    return os << "s." << sname.id;
+    return os << to_str(sname);
 }
 std::ostream& operator<<(std::ostream& os, const StringConstant& sc) {
     return os << sc.name << " = " << std::quoted(sc.value);
@@ -51,12 +51,7 @@ std::ostream& operator<<(std::ostream& os, const Value& val) {
 }
 
 std::ostream& operator<<(std::ostream& os, Type t) {
-    switch (t) {
-    case Type::INT: return os << "int";
-    case Type::BOOL: return os << "bool";
-    case Type::PTR: return os << "ptr";
-    }
-    __builtin_unreachable();
+    return os << to_str(t);
 }
 
 std::ostream& operator<<(std::ostream& os, UnaryOp uop) {
@@ -94,8 +89,7 @@ std::ostream& operator<<(std::ostream& os, const MemLoc& mloc) {
     os << '[';
     std::visit([&](auto const& x) { os << x; }, mloc.base);
     if (mloc.scale != 0) {
-        os << " + ";
-        os << mloc.scale << " * ";
+        os << " + " << mloc.scale << " * ";
         std::visit([&](auto const& x) { os << x; }, mloc.index);
     }
     if (mloc.displacement != 0) {
@@ -123,9 +117,12 @@ std::ostream& operator<<(std::ostream& os, const IConstLoad& i) {
     return os << i.var << ' ' << i.type << " = " << i.loc;
 }
 std::ostream& operator<<(std::ostream& os, const IStore& i) {
-    return os << i.loc << " = " << i.val;
+    return os << i.loc << ' ' << i.type << " = " << i.val;
 }
-std::ostream& operator<<(std::ostream& os, const std::vector<Value>& vals) {
+std::ostream& operator<<(std::ostream& os, const CallArg& call_arg) {
+    return os << call_arg.type << ' ' << call_arg.val;
+}
+std::ostream& operator<<(std::ostream& os, const std::vector<CallArg>& vals) {
     bool first = true;
     for (auto const& val : vals) {
         if (first) {

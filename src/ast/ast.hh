@@ -221,6 +221,12 @@ struct GlobalSymbols {
     static inline const std::map<ast::Ident, ast::Type::TFun> builtin_functions = [] {
         std::map<ast::Ident, ast::Type::TFun> res;
         res.try_emplace(
+            "error",
+            Type::TFun{
+                .ret_type = std::make_unique<Type>(ast::type_void),
+                .arg_types = std::make_unique<std::vector<Type>>(),
+            });
+        res.try_emplace(
             "printInt",
             Type::TFun{
                 .ret_type = std::make_unique<Type>(ast::type_void),
@@ -231,12 +237,6 @@ struct GlobalSymbols {
             Type::TFun{
                 .ret_type = std::make_unique<Type>(ast::type_void),
                 .arg_types = std::make_unique<std::vector<Type>>(1, ast::type_str),
-            });
-        res.try_emplace(
-            "error",
-            Type::TFun{
-                .ret_type = std::make_unique<Type>(ast::type_void),
-                .arg_types = std::make_unique<std::vector<Type>>(),
             });
         res.try_emplace(
             "readInt",
