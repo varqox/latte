@@ -20,9 +20,7 @@ struct Label {
     DEFINE_CMP_OPERATORS_BY_FIELD(Label, id)
 };
 
-inline std::string to_str(const Label& label) {
-    return concat(".L", label.id);
-}
+inline std::string to_str(const Label& label) { return concat(".L", label.id); }
 
 struct Var {
     size_t id;
@@ -39,9 +37,7 @@ struct FnName {
     DEFINE_CMP_OPERATORS_BY_FIELD(FnName, mangled_name)
 };
 
-inline std::string to_str(const FnName& fname) {
-    return concat("f.", fname.mangled_name);
-}
+inline std::string to_str(const FnName& fname) { return concat("f.", fname.mangled_name); }
 
 inline const FnName builtin_zalloc = FnName{.mangled_name = "@@zalloc"}; // (INT) -> PTR
 inline const FnName builtin_free = FnName{.mangled_name = "@@free"}; // (PTR) -> void
@@ -67,7 +63,8 @@ inline const FnName builtin_inc_ref_count =
     FnName{.mangled_name = "@@inc_ref_count"}; // (PTR) -> void
 inline const FnName builtin_error = FnName{.mangled_name = "@error"}; // () -> void
 inline const FnName builtin_printInt = FnName{.mangled_name = "@printInt"}; // (INT) -> void
-inline const FnName builtin_printString = FnName{.mangled_name = "@printString"}; // (PTR) -> void
+inline const FnName builtin_printString =
+    FnName{.mangled_name = "@printString"}; // (PTR) -> void
 inline const FnName builtin_readInt = FnName{.mangled_name = "@readInt"}; // () -> INT
 inline const FnName builtin_readString = FnName{.mangled_name = "@readString"}; // () -> INT
 
@@ -90,9 +87,7 @@ struct StringConstantName {
     DEFINE_CMP_OPERATORS_BY_FIELD(StringConstantName, id)
 };
 
-inline std::string to_str(const StringConstantName& sname) {
-    return concat("s.", sname.id);
-}
+inline std::string to_str(const StringConstantName& sname) { return concat("s.", sname.id); }
 
 struct StringConstant {
     StringConstantName name;

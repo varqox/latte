@@ -1,0 +1,3 @@
+[submodule "my-mrjp-tests"]
+	path = my-mrjp-tests
+	url = https://github.com/varqox/mrjp-tests

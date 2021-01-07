@@ -1,6 +1,0 @@
-// Author: Krzysztof Małysa (2020)
-int main() {
-	int x = readInt();
-	(x > 0) && false;
-	return 0;
-}

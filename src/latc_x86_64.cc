@@ -11,14 +11,14 @@
 
 #include <cerrno>
 #include <cstddef>
-#include <sys/types.h>
-#include <sys/wait.h>
 #include <cstdio>
 #include <cstdlib>
 #include <cstring>
 #include <fstream>
 #include <iostream>
 #include <string_view>
+#include <sys/types.h>
+#include <sys/wait.h>
 #include <type_traits>
 #include <unistd.h>
 
@@ -36,7 +36,9 @@ template <
     _exit(1);
 }
 
-int execute_command(std::string command, std::vector<std::string> args, const char* stdout_file, const char* stderr_file) {
+int execute_command(
+    std::string command, std::vector<std::string> args, const char* stdout_file,
+    const char* stderr_file) {
     pid_t child = fork();
     if (child < 0) {
         fail("failed to fork() - ", strerror(errno));

@@ -250,20 +250,20 @@ class AstTranslator {
     void generate_constructor_for(const ast::TopDef::ClassDef& cl) {
         generate_initializer_for(cl);
         generate_func(
-            constructor_name(cl.name),
-            global_symbols.classes.at(cl.name).type,
-            std::nullopt, {}, [&](BBlockContext& bbc) {
+            constructor_name(cl.name), global_symbols.classes.at(cl.name).type, std::nullopt,
+            {}, [&](BBlockContext& bbc) {
                 auto var = bbc.var_allocator.alloc();
                 bbc.append_instruction(ir::ICall{
                     .var = var,
                     .type = ir::Type::PTR,
                     .func = ir::builtin_zalloc,
-                    .args = {
-                        ir::CallArg{
-                            .val = class_sizeof(cl.name),
-                            .type = ir::Type::INT,
+                    .args =
+                        {
+                            ir::CallArg{
+                                .val = class_sizeof(cl.name),
+                                .type = ir::Type::INT,
+                            },
                         },
-                    },
                 });
                 bbc.append_instruction(ir::IStore{
                     .loc = ref_count_loc(var),
@@ -277,12 +277,13 @@ class AstTranslator {
                 });
                 bbc.append_instruction(ir::IVCall{
                     .func = initializer_name(cl.name),
-                    .args = {
-                        ir::CallArg{
-                            .val = var,
-                            .type = ir::Type::PTR,
+                    .args =
+                        {
+                            ir::CallArg{
+                                .val = var,
+                                .type = ir::Type::PTR,
+                            },
                         },
-                    },
                 });
                 bbc.append_instruction(ir::IReturn{
                     .val = var,
@@ -292,18 +293,20 @@ class AstTranslator {
 
     void generate_initializer_for(const ast::TopDef::ClassDef& cl) {
         generate_func(
-            initializer_name(cl.name), ast::type_void, NonOwnedSelf{}, {}, [&](BBlockContext& bbc) {
+            initializer_name(cl.name), ast::type_void, NonOwnedSelf{}, {},
+            [&](BBlockContext& bbc) {
                 auto& self = *bbc.var_env.find("self");
                 assert(self.destructor.is_empty());
                 if (cl.base_class_name) {
                     bbc.append_instruction(ir::IVCall{
                         .func = initializer_name(*cl.base_class_name),
-                        .args = {
-                            ir::CallArg{
-                                .val = self.var,
-                                .type = ir::Type::PTR,
+                        .args =
+                            {
+                                ir::CallArg{
+                                    .val = self.var,
+                                    .type = ir::Type::PTR,
+                                },
                             },
-                        },
                     });
                 }
                 auto& cl_sym = global_symbols.classes.at(cl.name);
@@ -331,7 +334,8 @@ class AstTranslator {
     void generate_destructor_for(const ast::TopDef::ClassDef& cl) {
         generate_deinitializer_for(cl);
         generate_func(
-            destructor_name(cl.name), ast::type_void, NonOwnedSelf{}, {}, [&](BBlockContext& bbc) {
+            destructor_name(cl.name), ast::type_void, NonOwnedSelf{}, {},
+            [&](BBlockContext& bbc) {
                 auto& self = *bbc.var_env.find("self");
                 assert(self.destructor.is_empty());
                 auto prev_ref_count = bbc.var_allocator.alloc();
@@ -372,21 +376,23 @@ class AstTranslator {
                 bbc.new_bblock(zero_rc_label);
                 bbc.append_instruction(ir::IVCall{
                     .func = deinitializer_name(cl.name),
-                    .args = {
-                        ir::CallArg{
-                            .val = self.var,
-                            .type = ir::Type::PTR,
+                    .args =
+                        {
+                            ir::CallArg{
+                                .val = self.var,
+                                .type = ir::Type::PTR,
+                            },
                         },
-                    },
                 });
                 bbc.append_instruction(ir::IVCall{
                     .func = ir::builtin_free,
-                    .args = {
-                        ir::CallArg{
-                            .val = self.var,
-                            .type = ir::Type::PTR,
+                    .args =
+                        {
+                            ir::CallArg{
+                                .val = self.var,
+                                .type = ir::Type::PTR,
+                            },
                         },
-                    },
                 });
                 bbc.append_instruction(ir::IReturn{
                     .val = std::nullopt,
@@ -394,10 +400,10 @@ class AstTranslator {
             });
     }
 
-
     void generate_deinitializer_for(const ast::TopDef::ClassDef& cl) {
         generate_func(
-            deinitializer_name(cl.name), ast::type_void, NonOwnedSelf{}, {}, [&](BBlockContext& bbc) {
+            deinitializer_name(cl.name), ast::type_void, NonOwnedSelf{}, {},
+            [&](BBlockContext& bbc) {
                 auto& self = *bbc.var_env.find("self");
                 assert(self.destructor.is_empty());
                 auto& cl_sym = global_symbols.classes.at(cl.name);
@@ -422,12 +428,13 @@ class AstTranslator {
                 if (cl.base_class_name) {
                     bbc.append_instruction(ir::IVCall{
                         .func = deinitializer_name(*cl.base_class_name),
-                        .args = {
-                            ir::CallArg{
-                                .val = self.var,
-                                .type = ir::Type::PTR,
+                        .args =
+                            {
+                                ir::CallArg{
+                                    .val = self.var,
+                                    .type = ir::Type::PTR,
+                                },
                             },
-                        },
                     });
                 }
                 bbc.append_instruction(ir::IReturn{
@@ -451,12 +458,13 @@ class AstTranslator {
                         .var = var,
                         .type = ir::Type::PTR,
                         .func = ir::builtin_make_string,
-                        .args = {
-                            ir::CallArg{
-                                .val = make_string_constant(""),
-                                .type = ir::Type::PTR,
+                        .args =
+                            {
+                                ir::CallArg{
+                                    .val = make_string_constant(""),
+                                    .type = ir::Type::PTR,
+                                },
                             },
-                        },
                     });
                     bbc.append_instruction(ir::IStore{
                         .loc = loc,
@@ -501,12 +509,13 @@ class AstTranslator {
                         .var = dest,
                         .type = ir::Type::PTR,
                         .func = ir::builtin_make_string,
-                        .args = {
-                            ir::CallArg{
-                                .val = make_string_constant(""),
-                                .type = ir::Type::PTR,
+                        .args =
+                            {
+                                ir::CallArg{
+                                    .val = make_string_constant(""),
+                                    .type = ir::Type::PTR,
+                                },
                             },
-                        },
                     });
                 },
                 [&](const ast::Type::TBool& /*unused*/) {
@@ -567,12 +576,13 @@ class AstTranslator {
                 });
                 bbc.append_instruction(ir::IVCall{
                     .func = destructor_loc(vtable),
-                    .args = {
-                        ir::CallArg{
-                            .val = self.var,
-                            .type = ir::Type::PTR,
+                    .args =
+                        {
+                            ir::CallArg{
+                                .val = self.var,
+                                .type = ir::Type::PTR,
+                            },
                         },
-                    },
                 });
                 bbc.append_instruction(ir::IGoto{
                     .target = return_label,
@@ -599,12 +609,13 @@ class AstTranslator {
                 [&](const ast::Type::TStr& /*unused*/) {
                     destructor.append(ir::IVCall{
                         .func = ir::builtin_destruct_string,
-                        .args = {
-                            ir::CallArg{
-                                .val = var,
-                                .type = ir::Type::PTR,
+                        .args =
+                            {
+                                ir::CallArg{
+                                    .val = var,
+                                    .type = ir::Type::PTR,
+                                },
                             },
-                        },
                     });
                 },
                 [&](const ast::Type::TBool& /*unused*/) {
@@ -616,23 +627,25 @@ class AstTranslator {
                 [&](const ast::Type::TArray& ta) {
                     destructor.append(ir::IVCall{
                         .func = array_constructor_and_destructor_name(*ta.elem_type).second,
-                        .args = {
-                            ir::CallArg{
-                                .val = var,
-                                .type = ir::Type::PTR,
+                        .args =
+                            {
+                                ir::CallArg{
+                                    .val = var,
+                                    .type = ir::Type::PTR,
+                                },
                             },
-                        },
                     });
                 },
                 [&](const ast::Type::TClass& /*unused*/) {
                     destructor.append(ir::IVCall{
                         .func = universal_class_destructor_name(),
-                        .args = {
-                            ir::CallArg{
-                                .val = var,
-                                .type = ir::Type::PTR,
+                        .args =
+                            {
+                                ir::CallArg{
+                                    .val = var,
+                                    .type = ir::Type::PTR,
+                                },
                             },
-                        },
                     });
                 },
                 [&](const ast::Type::TFun& /*unused*/) {
@@ -717,12 +730,13 @@ class AstTranslator {
                 [&](const ast::Type::TStr& /*unused*/) {
                     res.append(ir::IVCall{
                         .func = ir::builtin_inc_ref_count,
-                        .args = {
-                            ir::CallArg{
-                                .val = val,
-                                .type = ir::Type::PTR,
+                        .args =
+                            {
+                                ir::CallArg{
+                                    .val = val,
+                                    .type = ir::Type::PTR,
+                                },
                             },
-                        },
                     });
                 },
                 [&](const ast::Type::TBool& /*unused*/) {
@@ -734,23 +748,25 @@ class AstTranslator {
                 [&](const ast::Type::TArray& /*unused*/) {
                     res.append(ir::IVCall{
                         .func = ir::builtin_inc_ref_count,
-                        .args = {
-                            ir::CallArg{
-                                .val = val,
-                                .type = ir::Type::PTR,
+                        .args =
+                            {
+                                ir::CallArg{
+                                    .val = val,
+                                    .type = ir::Type::PTR,
+                                },
                             },
-                        },
                     });
                 },
                 [&](const ast::Type::TClass& /*unused*/) {
                     res.append(ir::IVCall{
                         .func = ir::builtin_inc_ref_count,
-                        .args = {
-                            ir::CallArg{
-                                .val = val,
-                                .type = ir::Type::PTR,
+                        .args =
+                            {
+                                ir::CallArg{
+                                    .val = val,
+                                    .type = ir::Type::PTR,
+                                },
                             },
-                        },
                     });
                 },
                 [&](const ast::Type::TFun& /*unused*/) {
@@ -870,12 +886,13 @@ class AstTranslator {
                     .var = arr,
                     .type = ir::Type::PTR,
                     .func = ir::builtin_zalloc,
-                    .args = {
-                        ir::CallArg{
-                            .val = arr_sizeof,
-                            .type = ir::Type::INT,
+                    .args =
+                        {
+                            ir::CallArg{
+                                .val = arr_sizeof,
+                                .type = ir::Type::INT,
+                            },
                         },
-                    },
                 });
                 bbc.append_instruction(ir::IStore{
                     .loc = arr_ref_cnt_loc(arr),
@@ -929,115 +946,113 @@ class AstTranslator {
                     .val = arr,
                 });
             });
-        generate_func(
-            dtor_name, ast::type_void, NonOwnedSelf{},
-            {},
-            [&](BBlockContext& bbc) {
-                auto& arr = *bbc.var_env.find("self");
-                assert(arr.destructor.is_empty());
-                auto return_label = bbc.label_allocator.alloc();
-                auto not_null_arr_label = bbc.label_allocator.alloc();
-                bbc.append_instruction(ir::IIfBinCond{
-                    .op = ir::RelOp::EQ,
-                    .type = ir::Type::PTR,
-                    .left = arr.var,
-                    .right = ir::Null{},
-                    .true_branch = return_label,
-                    .false_branch = not_null_arr_label,
-                });
-                // arr != null
-                bbc.new_bblock(not_null_arr_label);
-                auto prev_ref_count = bbc.var_allocator.alloc();
-                bbc.append_instruction(ir::ILoad{
-                    .var = prev_ref_count,
+        generate_func(dtor_name, ast::type_void, NonOwnedSelf{}, {}, [&](BBlockContext& bbc) {
+            auto& arr = *bbc.var_env.find("self");
+            assert(arr.destructor.is_empty());
+            auto return_label = bbc.label_allocator.alloc();
+            auto not_null_arr_label = bbc.label_allocator.alloc();
+            bbc.append_instruction(ir::IIfBinCond{
+                .op = ir::RelOp::EQ,
+                .type = ir::Type::PTR,
+                .left = arr.var,
+                .right = ir::Null{},
+                .true_branch = return_label,
+                .false_branch = not_null_arr_label,
+            });
+            // arr != null
+            bbc.new_bblock(not_null_arr_label);
+            auto prev_ref_count = bbc.var_allocator.alloc();
+            bbc.append_instruction(ir::ILoad{
+                .var = prev_ref_count,
+                .type = ir::Type::INT,
+                .loc = arr_ref_cnt_loc(arr.var),
+            });
+            auto ref_count = bbc.var_allocator.alloc();
+            bbc.append_instruction(ir::IBinOp{
+                .var = ref_count,
+                .type = ir::Type::INT,
+                .op = ir::BinOp::SUB,
+                .left = prev_ref_count,
+                .right = 1,
+            });
+            auto non_zero_rc_label = bbc.label_allocator.alloc();
+            auto zero_rc_label = bbc.label_allocator.alloc();
+            bbc.append_instruction(ir::IIfBinCond{
+                .op = ir::RelOp::EQ,
+                .type = ir::Type::INT,
+                .left = ref_count,
+                .right = 0,
+                .true_branch = zero_rc_label,
+                .false_branch = non_zero_rc_label,
+            });
+            // Save decreased value
+            bbc.new_bblock(non_zero_rc_label);
+            bbc.append_instruction(ir::IStore{
+                .loc = arr_ref_cnt_loc(arr.var),
+                .type = ir::Type::INT,
+                .val = ref_count,
+            });
+            bbc.append_instruction(ir::IReturn{
+                .val = std::nullopt,
+            });
+            // Destruct elements + free
+            bbc.new_bblock(zero_rc_label);
+            if (translate(elem_type) == ir::Type::PTR) {
+                auto idx = bbc.var_allocator.alloc();
+                auto body_label = bbc.label_allocator.alloc();
+                auto cond_label = bbc.label_allocator.alloc();
+                auto done_label = bbc.label_allocator.alloc();
+                bbc.append_instruction(ir::IConstLoad{
+                    .var = idx,
                     .type = ir::Type::INT,
-                    .loc = arr_ref_cnt_loc(arr.var),
+                    .loc = arr_len_loc(arr.var),
                 });
-                auto ref_count = bbc.var_allocator.alloc();
+                bbc.append_instruction(ir::IGoto{
+                    .target = cond_label,
+                });
+                // Loop body
+                bbc.new_bblock(body_label);
                 bbc.append_instruction(ir::IBinOp{
-                    .var = ref_count,
+                    .var = idx,
                     .type = ir::Type::INT,
                     .op = ir::BinOp::SUB,
-                    .left = prev_ref_count,
+                    .left = idx,
                     .right = 1,
                 });
-                auto non_zero_rc_label = bbc.label_allocator.alloc();
-                auto zero_rc_label = bbc.label_allocator.alloc();
+                inplace_destructor_generator(elem_type, arr_elem_loc(arr.var, idx))(bbc);
+                bbc.append_instruction(ir::IGoto{
+                    .target = cond_label,
+                });
+                // Loop condition
+                bbc.new_bblock(cond_label);
                 bbc.append_instruction(ir::IIfBinCond{
-                    .op = ir::RelOp::EQ,
+                    .op = ir::RelOp::GTH,
                     .type = ir::Type::INT,
-                    .left = ref_count,
+                    .left = idx,
                     .right = 0,
-                    .true_branch = zero_rc_label,
-                    .false_branch = non_zero_rc_label,
+                    .true_branch = body_label,
+                    .false_branch = done_label,
                 });
-                // Save decreased value
-                bbc.new_bblock(non_zero_rc_label);
-                bbc.append_instruction(ir::IStore{
-                    .loc = arr_ref_cnt_loc(arr.var),
-                    .type = ir::Type::INT,
-                    .val = ref_count,
-                });
-                bbc.append_instruction(ir::IReturn{
-                    .val = std::nullopt,
-                });
-                // Destruct elements + free
-                bbc.new_bblock(zero_rc_label);
-                if (translate(elem_type) == ir::Type::PTR) {
-                    auto idx = bbc.var_allocator.alloc();
-                    auto body_label = bbc.label_allocator.alloc();
-                    auto cond_label = bbc.label_allocator.alloc();
-                    auto done_label = bbc.label_allocator.alloc();
-                    bbc.append_instruction(ir::IConstLoad{
-                        .var = idx,
-                        .type = ir::Type::INT,
-                        .loc = arr_len_loc(arr.var),
-                    });
-                    bbc.append_instruction(ir::IGoto{
-                        .target = cond_label,
-                    });
-                    // Loop body
-                    bbc.new_bblock(body_label);
-                    bbc.append_instruction(ir::IBinOp{
-                        .var = idx,
-                        .type = ir::Type::INT,
-                        .op = ir::BinOp::SUB,
-                        .left = idx,
-                        .right = 1,
-                    });
-                    inplace_destructor_generator(elem_type, arr_elem_loc(arr.var, idx))(bbc);
-                    bbc.append_instruction(ir::IGoto{
-                        .target = cond_label,
-                    });
-                    // Loop condition
-                    bbc.new_bblock(cond_label);
-                    bbc.append_instruction(ir::IIfBinCond{
-                        .op = ir::RelOp::GTH,
-                        .type = ir::Type::INT,
-                        .left = idx,
-                        .right = 0,
-                        .true_branch = body_label,
-                        .false_branch = done_label,
-                    });
-                    bbc.new_bblock(done_label);
-                }
-                bbc.append_instruction(ir::IVCall{
-                    .func = ir::builtin_free,
-                    .args = {
+                bbc.new_bblock(done_label);
+            }
+            bbc.append_instruction(ir::IVCall{
+                .func = ir::builtin_free,
+                .args =
+                    {
                         ir::CallArg{
                             .val = arr.var,
                             .type = ir::Type::PTR,
                         },
                     },
-                });
-                bbc.append_instruction(ir::IGoto{
-                    .target = return_label,
-                });
-                bbc.new_bblock(return_label);
-                bbc.append_instruction(ir::IReturn{
-                    .val = std::nullopt,
-                });
             });
+            bbc.append_instruction(ir::IGoto{
+                .target = return_label,
+            });
+            bbc.new_bblock(return_label);
+            bbc.append_instruction(ir::IReturn{
+                .val = std::nullopt,
+            });
+        });
         return {ctor_name, dtor_name};
     }
 
@@ -1444,12 +1459,13 @@ class AstTranslator {
                             .var = var,
                             .type = ir::Type::PTR,
                             .func = ir::builtin_make_string,
-                            .args = {
-                                ir::CallArg{
-                                    .val = make_string_constant(s),
-                                    .type = ir::Type::PTR,
+                            .args =
+                                {
+                                    ir::CallArg{
+                                        .val = make_string_constant(s),
+                                        .type = ir::Type::PTR,
+                                    },
                                 },
-                            },
                         });
                         return RValue{
                             .val = var,
@@ -1550,7 +1566,8 @@ class AstTranslator {
             std::vector<std::pair<RValue, ir::Type>> val_args;
             val_args.reserve(args.size());
             for (auto const& arg : args) {
-                auto& [rval, type] = val_args.emplace_back(translate_to_rvalue(bbc, arg), translate(arg.type));
+                auto& [rval, type] =
+                    val_args.emplace_back(translate_to_rvalue(bbc, arg), translate(arg.type));
                 rval.ensure_val_is_owned(bbc);
             }
             MakeFnNameAndArgsRes mres = make_name_and_args(val_args);
@@ -1650,39 +1667,41 @@ class AstTranslator {
                     };
                 },
                 [&](const ast::Expr::ECallFunc& fcall) -> RValue {
-                    return translate_fcall(*fcall.args, [&](const std::vector<std::pair<RValue, ir::Type>>& args) {
-                        MakeFnNameAndArgsRes res;
-                        switch (fcall.kind) {
-                        case ast::Expr::ECallFunc::Kind::METHOD: {
-                            auto obj = local_var("self", fcall.method_class->type);
-                            obj.ensure_val_is_owned(bbc);
-                            auto vtable = bbc.var_allocator.alloc();
-                            bbc.append_instruction(ir::IConstLoad{
-                                .var = vtable,
-                                .type = ir::Type::PTR,
-                                .loc = vtable_loc(val_to_var_or_null(obj.val.value())),
-                            });
-                            res.func =
-                                method_loc(vtable, *fcall.method_class, fcall.func_name);
-                            res.args.emplace_back(ir::CallArg{
-                                .val = obj.val.value(),
-                                .type = ir::Type::PTR,
-                            });
-                            res.other_destructors = std::move(obj.other_destructors);
-                        } break;
-                        case ast::Expr::ECallFunc::Kind::BUILTIN:
-                        case ast::Expr::ECallFunc::Kind::FUNCTION: {
-                            res.func = fn_name_from(fcall.func_name);
-                        } break;
-                        }
-                        for (auto const& [arg, type] : args) {
-                            res.args.emplace_back(ir::CallArg{
-                                .val = arg.val.value(),
-                                .type = type,
-                            });
-                        }
-                        return res;
-                    });
+                    return translate_fcall(
+                        *fcall.args,
+                        [&](const std::vector<std::pair<RValue, ir::Type>>& args) {
+                            MakeFnNameAndArgsRes res;
+                            switch (fcall.kind) {
+                            case ast::Expr::ECallFunc::Kind::METHOD: {
+                                auto obj = local_var("self", fcall.method_class->type);
+                                obj.ensure_val_is_owned(bbc);
+                                auto vtable = bbc.var_allocator.alloc();
+                                bbc.append_instruction(ir::IConstLoad{
+                                    .var = vtable,
+                                    .type = ir::Type::PTR,
+                                    .loc = vtable_loc(val_to_var_or_null(obj.val.value())),
+                                });
+                                res.func =
+                                    method_loc(vtable, *fcall.method_class, fcall.func_name);
+                                res.args.emplace_back(ir::CallArg{
+                                    .val = obj.val.value(),
+                                    .type = ir::Type::PTR,
+                                });
+                                res.other_destructors = std::move(obj.other_destructors);
+                            } break;
+                            case ast::Expr::ECallFunc::Kind::BUILTIN:
+                            case ast::Expr::ECallFunc::Kind::FUNCTION: {
+                                res.func = fn_name_from(fcall.func_name);
+                            } break;
+                            }
+                            for (auto const& [arg, type] : args) {
+                                res.args.emplace_back(ir::CallArg{
+                                    .val = arg.val.value(),
+                                    .type = type,
+                                });
+                            }
+                            return res;
+                        });
                 },
                 [&](const ast::Expr::EField& field) -> RValue {
                     switch (field.kind) {
@@ -1711,30 +1730,33 @@ class AstTranslator {
                     __builtin_unreachable();
                 },
                 [&](const ast::Expr::ECallMethod& mcall) -> RValue {
-                    return translate_fcall(*mcall.args, [&](const std::vector<std::pair<RValue, ir::Type>>& args) {
-                        auto obj = translate_to_rvalue(bbc, *mcall.object);
-                        obj.ensure_val_is_owned(bbc);
-                        MakeFnNameAndArgsRes res;
-                        auto vtable = bbc.var_allocator.alloc();
-                        bbc.append_instruction(ir::IConstLoad{
-                            .var = vtable,
-                            .type = ir::Type::PTR,
-                            .loc = vtable_loc(val_to_var_or_null(obj.val.value())),
-                        });
-                        res.func = method_loc(vtable, *mcall.method_class, mcall.method_name);
-                        res.args.emplace_back(ir::CallArg{
-                            .val = obj.val.value(),
-                            .type = ir::Type::PTR,
-                        });
-                        for (auto const& [arg, type] : args) {
-                            res.args.emplace_back(ir::CallArg{
-                                .val = arg.val.value(),
-                                .type = type,
+                    return translate_fcall(
+                        *mcall.args,
+                        [&](const std::vector<std::pair<RValue, ir::Type>>& args) {
+                            auto obj = translate_to_rvalue(bbc, *mcall.object);
+                            obj.ensure_val_is_owned(bbc);
+                            MakeFnNameAndArgsRes res;
+                            auto vtable = bbc.var_allocator.alloc();
+                            bbc.append_instruction(ir::IConstLoad{
+                                .var = vtable,
+                                .type = ir::Type::PTR,
+                                .loc = vtable_loc(val_to_var_or_null(obj.val.value())),
                             });
-                        }
-                        res.other_destructors = std::move(obj.other_destructors);
-                        return res;
-                    });
+                            res.func =
+                                method_loc(vtable, *mcall.method_class, mcall.method_name);
+                            res.args.emplace_back(ir::CallArg{
+                                .val = obj.val.value(),
+                                .type = ir::Type::PTR,
+                            });
+                            for (auto const& [arg, type] : args) {
+                                res.args.emplace_back(ir::CallArg{
+                                    .val = arg.val.value(),
+                                    .type = type,
+                                });
+                            }
+                            res.other_destructors = std::move(obj.other_destructors);
+                            return res;
+                        });
                 },
                 [&](const ast::Expr::ENewArray& na) -> RValue {
                     auto len = translate_to_rvalue(bbc, *na.size);
@@ -1745,12 +1767,13 @@ class AstTranslator {
                         .var = var,
                         .type = ir::Type::PTR,
                         .func = ctor_name,
-                        .args = {
-                            ir::CallArg{
-                                .val = len.val.value(),
-                                .type = ir::Type::INT,
+                        .args =
+                            {
+                                ir::CallArg{
+                                    .val = len.val.value(),
+                                    .type = ir::Type::INT,
+                                },
                             },
-                        },
                     });
                     return {
                         .val = var,
@@ -1852,16 +1875,17 @@ class AstTranslator {
                             .var = var,
                             .type = ir::Type::BOOL,
                             .func = strcmp_func,
-                            .args = {
-                                ir::CallArg{
-                                    .val = lval.val.value(),
-                                    .type = ir::Type::PTR,
+                            .args =
+                                {
+                                    ir::CallArg{
+                                        .val = lval.val.value(),
+                                        .type = ir::Type::PTR,
+                                    },
+                                    ir::CallArg{
+                                        .val = rval.val.value(),
+                                        .type = ir::Type::PTR,
+                                    },
                                 },
-                                ir::CallArg{
-                                    .val = rval.val.value(),
-                                    .type = ir::Type::PTR,
-                                },
-                            },
                         });
                         return RValue{
                             .val = var,
@@ -1885,16 +1909,17 @@ class AstTranslator {
                             .var = var,
                             .type = ir::Type::PTR,
                             .func = ir::builtin_concat_strings,
-                            .args = {
-                                ir::CallArg{
-                                    .val = lval.val.value(),
-                                    .type = ir::Type::PTR,
+                            .args =
+                                {
+                                    ir::CallArg{
+                                        .val = lval.val.value(),
+                                        .type = ir::Type::PTR,
+                                    },
+                                    ir::CallArg{
+                                        .val = rval.val.value(),
+                                        .type = ir::Type::PTR,
+                                    },
                                 },
-                                ir::CallArg{
-                                    .val = rval.val.value(),
-                                    .type = ir::Type::PTR,
-                                },
-                            },
                         });
                         return {
                             .val = var,
@@ -2266,7 +2291,8 @@ class AstTranslator {
 
     template <class BodyGenerator>
     void generate_func(
-        ir::FnName fname, const ast::Type& ret_type, std::optional<std::variant<ast::Type, NonOwnedSelf>> self_type,
+        ir::FnName fname, const ast::Type& ret_type,
+        std::optional<std::variant<ast::Type, NonOwnedSelf>> self_type,
         const std::vector<ast::FnArg>& args, BodyGenerator&& body_generator) {
         static_assert(std::is_invocable_v<BodyGenerator&&, BBlockContext&>);
         BBlockContext bbc;
@@ -2281,14 +2307,14 @@ class AstTranslator {
         // Every arg owns its value
         if (self_type) {
             bbc.fdef.args.emplace_back(ir::FnArg{
-                .var = std::visit(overloaded{
-                    [&](const ast::Type& type) {
-                        return alloc_env_var(bbc, type, "self");
+                .var = std::visit(
+                    overloaded{
+                        [&](const ast::Type& type) {
+                            return alloc_env_var(bbc, type, "self");
+                        },
+                        [&](const NonOwnedSelf&) { return bbc.alloc_env_var("self", {}); },
                     },
-                    [&](const NonOwnedSelf&) {
-                        return bbc.alloc_env_var("self", {});
-                    },
-                }, self_type.value()),
+                    self_type.value()),
                 .type = ir::Type::PTR,
             });
         }

@@ -11,13 +11,9 @@
 
 namespace ir {
 
-std::ostream& operator<<(std::ostream& os, const Label& lname) {
-    return os << to_str(lname);
-}
+std::ostream& operator<<(std::ostream& os, const Label& lname) { return os << to_str(lname); }
 std::ostream& operator<<(std::ostream& os, const Var& vname) { return os << 'v' << vname.id; }
-std::ostream& operator<<(std::ostream& os, const FnName& fname) {
-    return os << to_str(fname);
-}
+std::ostream& operator<<(std::ostream& os, const FnName& fname) { return os << to_str(fname); }
 std::ostream& operator<<(std::ostream& os, const VTableName& vt_name) {
     return os << to_str(vt_name);
 }
@@ -50,9 +46,7 @@ std::ostream& operator<<(std::ostream& os, const Value& val) {
     return os;
 }
 
-std::ostream& operator<<(std::ostream& os, Type t) {
-    return os << to_str(t);
-}
+std::ostream& operator<<(std::ostream& os, Type t) { return os << to_str(t); }
 
 std::ostream& operator<<(std::ostream& os, UnaryOp uop) {
     switch (uop) {
