@@ -8,6 +8,7 @@
 #include "src/frontend/static_analyzer.hh"
 #include "src/frontend/type_checker.hh"
 #include "src/ir/ast_to_ir.hh"
+#include "src/ir/ir_printer.hh"
 
 #include <cerrno>
 #include <cstddef>
@@ -67,9 +68,54 @@ int execute_command(
     return status;
 }
 
+namespace {
+
+struct Options {
+    bool help = false;
+    bool emit_ir = false;
+};
+
+Options parse_options(int& argc, char** argv) {
+    Options res;
+    int new_argc = 1;
+    for (int i = 1; i < argc; ++i) {
+        if (argv[i][0] != '-') {
+            argv[new_argc++] = argv[i];
+            continue;
+        }
+        string_view arg = argv[i];
+        if (arg == "-h" or arg == "--help") {
+            res.help = true;
+        } else if (arg == "-emit-ir" or arg == "--emit-ir") {
+            res.emit_ir = true;
+        } else {
+            fail("unknown option: '", arg, '\'');
+        }
+    }
+    argc = new_argc;
+    argv[argc] = nullptr;
+    return res;
+}
+
+void print_help(const char* prog_name) {
+    printf("usage: %s [-h|--help] [-emit-ir|--emit-ir] <path>\n", prog_name);
+}
+
+} // namespace
+
 int main(int argc, char** argv) {
-    if (argc != 2) {
-        fail("invalid number of arguments, expected one argument");
+    auto cmd_options = parse_options(argc, argv);
+    if (cmd_options.help) {
+        print_help(argv[0]);
+        return 0;
+    }
+    if (argc < 2) {
+        print_help(argv[0]);
+        fail("missing argument");
+        return 1;
+    }
+    if (argc > 2) {
+        fail("too many arguments, expected one");
     }
     string_view filename = argv[1];
     string_view suffix = ".lat";
@@ -111,7 +157,12 @@ int main(int argc, char** argv) {
         auto global_symbols = frontend::collect_global_symbols(prog_ast, error_printer);
         frontend::check_and_annotate_types(prog_ast, global_symbols, error_printer);
         frontend::static_analyze(prog_ast, error_printer);
+
         auto ir_prog = ir::translate_ast_to_ir(prog_ast, global_symbols);
+        if (cmd_options.emit_ir) {
+            std::ofstream{concat(base_path, ".ir")} << ir_prog;
+        }
+
         auto asm_file_path = concat(base_path, ".s");
         {
             std::ofstream out{asm_file_path};
@@ -120,6 +171,7 @@ int main(int argc, char** argv) {
         auto obj_file_path = concat(base_path, ".o");
         execute("nasm", {"-f", "elf64", "-g", asm_file_path, "-o", obj_file_path});
         execute("gcc", {obj_file_path, "-o", base_path});
+
         std::cerr << "OK\n" << error_printer.get_all_diagnostics();
         return 0;
     } catch (const frontend::ErrorPrinter::ErrorOccurred&) {

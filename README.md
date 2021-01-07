@@ -1,10 +1,10 @@
 # Latte compiler
 
-## Language extensions
+## Implemented language extensions
 - arrays
 - classes with inheritance and virtual methods
 - null implicitly converts to any array and to any class
-- destructors
+- destructors (garbage collection)
 
 ## Language semantics
 - variables namespace is independent of the functions (and methods) namespace, e.g. (accepted code):
@@ -80,4 +80,4 @@ Is realized via reference counting -- just like C++'s `std::shared_ptr`. Types t
 Are implemented in assembly (using libc) and are pasted at the beginning of every generated `*.s` file.
 
 ## Compiler flags
-// TODO
+* `--emit-ir` -- save IR (after applying optimizations) to file (for file `foo/bar.lat` writes IR to `foo/bar.ir`)

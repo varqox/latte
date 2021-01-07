@@ -1041,7 +1041,7 @@ class Emitter {
             emit_instr("mov rax, [rsp] ; line");
             emit_instr("jmp .done");
             emit_label(".getline_failed");
-            emit_instr("mov rdi, [rsp]");
+            emit_instr("mov rdi, [rsp] ; line");
             emit_instr("call free wrt ..plt");
             emit_instr("mov edi, 9");
             emit_instr("call malloc wrt ..plt");

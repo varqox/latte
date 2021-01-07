@@ -3,7 +3,6 @@
 #include "src/concat.hh"
 #include "src/defs.hh"
 #include "src/ir/ir.hh"
-#include "src/ir/ir_printer.hh"
 #include "src/list.hh"
 #include "src/member_comparator.hh"
 #include "src/overloaded.hh"
@@ -12,16 +11,12 @@
 
 #include <algorithm>
 #include <cassert>
-#include <iostream>
 #include <optional>
 #include <set>
 #include <type_traits>
 #include <variant>
 
 namespace {
-
-constexpr bool debug =
-    false; // TODO: make a parameter from this (as long as this is used to print ir)
 
 template <class XName>
 class NameAllocator {
@@ -2312,7 +2307,9 @@ class AstTranslator {
                         [&](const ast::Type& type) {
                             return alloc_env_var(bbc, type, "self");
                         },
-                        [&](const NonOwnedSelf&) { return bbc.alloc_env_var("self", {}); },
+                        [&](const NonOwnedSelf& /*unused*/) {
+                            return bbc.alloc_env_var("self", {});
+                        },
                     },
                     self_type.value()),
                 .type = ir::Type::PTR,
@@ -2380,9 +2377,6 @@ public:
                     [&](const ast::TopDef::ClassDef& cl) { translate(cl); },
                 },
                 top_def.val);
-        }
-        if constexpr (debug) {
-            std::cerr << translated_prog;
         }
         return std::move(translated_prog);
     }
