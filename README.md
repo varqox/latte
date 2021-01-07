@@ -1,9 +1,10 @@
-# Latte compiler (only frontend)
+# Latte compiler
 
 ## Language extensions
 - arrays
 - classes with inheritance and virtual methods
 - null implicitly converts to any array and to any class
+- destructors
 
 ## Language semantics
 - variables namespace is independent of the functions (and methods) namespace, e.g. (accepted code):
@@ -53,10 +54,30 @@ Project is implemented in C++17. For parsing BNFC with C backend was used.
     - `src/ast/` -- AST and code for transforming BNFC-generated AST into my AST
         - `src/ast/build.cc.template` -- transforming BNFC-generated AST into my AST
         - `build_gen.py` -- script for generating `src/ast/build.cc` from `src/ast/build.cc.template`
+    - `src/backend/x86_64.cc` -- translating IR to x86_64 assembly
     - `src/frontend/error.hh` -- utility to pretty-print compilation errors and warnings
     - `src/frontend/global_symbols.cc` -- building table of all global symbols aka. functions, classes and their fields and methods + analyzing inheritance and virtual methods
     - `src/frontend/type_checker.cc` -- checking type correctness
     - `src/frontend/static_analyzer.cc` -- static analysis i.e. compilation time computations, code reachability and control flow checking
+    - `src/ir/ast_to_ir.cc` -- translating AST to IR
+    - `src/ir/ir.hh` -- definition of the IR language
+    - `src/ir/ir_printer.cc` -- printing of the IR language
     - `src/latc_x86_64.cc` -- main code, that glues everything together
     - `src/persistent_map.hh` -- persistent map implemented using Treap (a randomized BST)
     - `src/persistent_map_tester.cc` -- test for `src/persistent_map.hh`
+
+## Backend
+Compiler backend is x86_64 in Intel flavor (NASM is used for assembly). So far it is quite simple and without optimizations. Nonetheless, everything (including memory reclaiming) seems to work.
+
+### Calling convention
+Arguments are passed on the stack, in a similar way that is in x86 C ABI.
+All registers except `RAX` are callee-save, `RAX` is used for the result, and is caller-save.
+
+### Memory reclaiming
+Is realized via reference counting -- just like C++'s `std::shared_ptr`. Types that have reference counting: string, classes and arrays.
+
+### Builtin functions
+Are implemented in assembly (using libc) and are pasted at the beginning of every generated `*.s` file.
+
+## Compiler flags
+// TODO
