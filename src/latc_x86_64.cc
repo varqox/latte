@@ -73,6 +73,7 @@ namespace {
 struct Options {
     bool help = false;
     bool emit_ir = false;
+    bool disable_destructors = false;
 };
 
 Options parse_options(int& argc, char** argv) {
@@ -88,6 +89,8 @@ Options parse_options(int& argc, char** argv) {
             res.help = true;
         } else if (arg == "-emit-ir" or arg == "--emit-ir") {
             res.emit_ir = true;
+        } else if (arg == "-disable-destructors" or arg == "--disable-destructors") {
+            res.disable_destructors = true;
         } else {
             fail("unknown option: '", arg, '\'');
         }
@@ -98,7 +101,10 @@ Options parse_options(int& argc, char** argv) {
 }
 
 void print_help(const char* prog_name) {
-    printf("usage: %s [-h|--help] [-emit-ir|--emit-ir] <path>\n", prog_name);
+    printf(
+        "usage: %s [-h|--help] [-emit-ir|--emit-ir] "
+        "[-disable-destructors|--disable-destructors] <path>\n",
+        prog_name);
 }
 
 } // namespace
@@ -158,7 +164,8 @@ int main(int argc, char** argv) {
         frontend::check_and_annotate_types(prog_ast, global_symbols, error_printer);
         frontend::static_analyze(prog_ast, error_printer);
 
-        auto ir_prog = ir::translate_ast_to_ir(prog_ast, global_symbols);
+        auto ir_prog =
+            ir::translate_ast_to_ir(prog_ast, global_symbols, cmd_options.disable_destructors);
         if (cmd_options.emit_ir) {
             std::ofstream{concat(base_path, ".ir")} << ir_prog;
         }
@@ -166,7 +173,7 @@ int main(int argc, char** argv) {
         auto asm_file_path = concat(base_path, ".s");
         {
             std::ofstream out{asm_file_path};
-            backend::emit_x86_64(std::move(ir_prog), out);
+            backend::emit_x86_64(std::move(ir_prog), out, cmd_options.disable_destructors);
         }
         auto obj_file_path = concat(base_path, ".o");
         execute("nasm", {"-f", "elf64", "-g", asm_file_path, "-o", obj_file_path});

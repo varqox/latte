@@ -6,6 +6,6 @@
 
 namespace backend {
 
-void emit_x86_64(ir::Program&& prog, std::ofstream& out);
+void emit_x86_64(ir::Program&& prog, std::ofstream& out, bool disable_destructors);
 
 } // namespace backend

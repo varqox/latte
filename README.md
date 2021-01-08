@@ -4,7 +4,7 @@
 - arrays
 - classes with inheritance and virtual methods
 - null implicitly converts to any array and to any class
-- destructors (garbage collection)
+- destructors (garbage collection); can be disabled -- see [Compiler flags](#c-flags).
 
 ## Language semantics
 - variables namespace is independent of the functions (and methods) namespace, e.g. (accepted code):
@@ -79,5 +79,6 @@ Is realized via reference counting -- just like C++'s `std::shared_ptr`. Types t
 ### Builtin functions
 Are implemented in assembly (using libc) and are pasted at the beginning of every generated `*.s` file.
 
-## Compiler flags
+## Compiler flags <a name="c-flags"></a>
 * `--emit-ir` -- save IR (after applying optimizations) to file (for file `foo/bar.lat` writes IR to `foo/bar.ir`)
+* `--disable-destructors` -- disable destructors (garbage collection implementation)

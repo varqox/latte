@@ -5,7 +5,8 @@
 
 namespace ir {
 
-Program
-translate_ast_to_ir(const ast::Program& prog, const ast::GlobalSymbols& global_symbols);
+Program translate_ast_to_ir(
+    const ast::Program& prog, const ast::GlobalSymbols& global_symbols,
+    bool disable_destructors);
 
 } // namespace ir

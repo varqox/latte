@@ -143,6 +143,7 @@ struct BBlockContext {
 
 class AstTranslator {
     const ast::GlobalSymbols& global_symbols;
+    const bool disable_destructors;
     ir::Program translated_prog;
 
     bool generated_universal_class_destructor = false;
@@ -170,7 +171,11 @@ class AstTranslator {
             .methods = {},
         });
         vtable.methods.resize(cl.methods.size() + 1);
-        vtable.methods[0] = destructor_name(cl.name);
+        if (not disable_destructors) {
+            vtable.methods[0] = destructor_name(cl.name);
+        } else {
+            vtable.methods[0] = ir::builtin_error;
+        }
         cl.methods.for_each([&vtable](
                                 const ast::Ident& method_name,
                                 const ast::GlobalSymbols::Class::Method& method) {
@@ -327,6 +332,9 @@ class AstTranslator {
     }
 
     void generate_destructor_for(const ast::TopDef::ClassDef& cl) {
+        if (disable_destructors) {
+            return;
+        }
         generate_deinitializer_for(cl);
         generate_func(
             destructor_name(cl.name), ast::type_void, NonOwnedSelf{}, {},
@@ -396,6 +404,7 @@ class AstTranslator {
     }
 
     void generate_deinitializer_for(const ast::TopDef::ClassDef& cl) {
+        assert(not disable_destructors);
         generate_func(
             deinitializer_name(cl.name), ast::type_void, NonOwnedSelf{}, {},
             [&](BBlockContext& bbc) {
@@ -545,6 +554,7 @@ class AstTranslator {
     }
 
     ir::FnName universal_class_destructor_name() {
+        assert(not disable_destructors);
         ir::FnName name = {.mangled_name = "@@universal_class_destructor"};
         if (not generated_universal_class_destructor) {
             generated_universal_class_destructor = true;
@@ -592,6 +602,9 @@ class AstTranslator {
     }
 
     List<ir::Instruction> destructor_for(ir::Var var, const ast::Type& type) {
+        if (disable_destructors) {
+            return {};
+        }
         List<ir::Instruction> destructor;
         std::visit(
             overloaded{
@@ -653,6 +666,9 @@ class AstTranslator {
 
     std::function<void(BBlockContext&)>
     inplace_destructor_generator(const ast::Type& type, ir::MemLoc loc) {
+        if (disable_destructors) {
+            return [](BBlockContext& /*unused*/) {};
+        }
         return std::visit(
             overloaded{
                 [&](const ast::Type::TNull& /*unused*/)
@@ -712,7 +728,10 @@ class AstTranslator {
             type.val);
     }
 
-    static List<ir::Instruction> owned_val_maker(ir::Value val, const ast::Type& type) {
+    List<ir::Instruction> owned_val_maker(ir::Value val, const ast::Type& type) const {
+        if (disable_destructors) {
+            return {};
+        }
         List<ir::Instruction> res;
         std::visit(
             overloaded{
@@ -941,6 +960,10 @@ class AstTranslator {
                     .val = arr,
                 });
             });
+
+        if (disable_destructors) {
+            return {ctor_name, dtor_name};
+        }
         generate_func(dtor_name, ast::type_void, NonOwnedSelf{}, {}, [&](BBlockContext& bbc) {
             auto& arr = *bbc.var_env.find("self");
             assert(arr.destructor.is_empty());
@@ -1483,7 +1506,7 @@ class AstTranslator {
                 *expr.comptime_val);
         }
 
-        auto local_var = [&bbc](const ast::Ident& var_name, const ast::Type& var_type) {
+        auto local_var = [this, &bbc](const ast::Ident& var_name, const ast::Type& var_type) {
             auto& vinfo = *bbc.var_env.find(var_name);
             return RValue{
                 .val = vinfo.var,
@@ -1756,8 +1779,7 @@ class AstTranslator {
                 [&](const ast::Expr::ENewArray& na) -> RValue {
                     auto len = translate_to_rvalue(bbc, *na.size);
                     auto var = bbc.var_allocator.alloc();
-                    auto [ctor_name, dtor_name] =
-                        array_constructor_and_destructor_name(na.elem_type);
+                    auto [ctor_name, _] = array_constructor_and_destructor_name(na.elem_type);
                     bbc.append_instruction(ir::ICall{
                         .var = var,
                         .type = ir::Type::PTR,
@@ -2362,8 +2384,9 @@ class AstTranslator {
     }
 
 public:
-    explicit AstTranslator(const ast::GlobalSymbols& global_symbols)
-    : global_symbols{global_symbols} {}
+    explicit AstTranslator(const ast::GlobalSymbols& global_symbols, bool disable_destructors)
+    : global_symbols{global_symbols}
+    , disable_destructors{disable_destructors} {}
 
     ir::Program translate(const ast::Program& prog) && {
         for (auto& top_def : prog.top_defs) {
@@ -2386,9 +2409,10 @@ public:
 
 namespace ir {
 
-Program
-translate_ast_to_ir(const ast::Program& prog, const ast::GlobalSymbols& global_symbols) {
-    return AstTranslator{global_symbols}.translate(prog);
+Program translate_ast_to_ir(
+    const ast::Program& prog, const ast::GlobalSymbols& global_symbols,
+    bool disable_destructors) {
+    return AstTranslator{global_symbols, disable_destructors}.translate(prog);
 }
 
 } // namespace ir

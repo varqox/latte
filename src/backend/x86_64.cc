@@ -774,6 +774,7 @@ public:
 
 class Emitter {
     std::ostream& out;
+    const bool disable_destructors;
 
     void emit(ir::StringConstant& sc) {
         out << sc.name << ": db `";
@@ -864,10 +865,12 @@ class Emitter {
             emit_instr("mov esi, ", arg(0));
             emit_instr("call calloc wrt ..plt");
         });
-        emit_builtin_func(ir::builtin_free, [&] {
-            emit_instr("mov rdi, ", arg(0));
-            emit_instr("call free wrt ..plt");
-        });
+        if (not disable_destructors) {
+            emit_builtin_func(ir::builtin_free, [&] {
+                emit_instr("mov rdi, ", arg(0));
+                emit_instr("call free wrt ..plt");
+            });
+        }
         emit_builtin_func(ir::builtin_make_string, [&] {
             emit_instr("mov rdi, ", arg(0));
             emit_instr("call strlen wrt ..plt");
@@ -942,15 +945,17 @@ class Emitter {
         emit_builtin_strcmp(ir::builtin_strcmp_eq);
         emit_builtin_strcmp(ir::builtin_strcmp_ne);
 
-        emit_builtin_func(ir::builtin_destruct_string, [&] {
-            emit_instr("mov rdi, ", arg(0));
-            emit_instr(
-                "; no need to test if rdi != 0 because string reference cannot be null");
-            emit_instr("sub dword [rdi], 1 ; ref count");
-            emit_instr("jnz .L0");
-            emit_instr("call free wrt ..plt");
-            emit_label(".L0");
-        });
+        if (not disable_destructors) {
+            emit_builtin_func(ir::builtin_destruct_string, [&] {
+                emit_instr("mov rdi, ", arg(0));
+                emit_instr(
+                    "; no need to test if rdi != 0 because string reference cannot be null");
+                emit_instr("sub dword [rdi], 1 ; ref count");
+                emit_instr("jnz .L0");
+                emit_instr("call free wrt ..plt");
+                emit_label(".L0");
+            });
+        }
 
         out << '\n' << ir::builtin_inc_ref_count << ":\n";
         {
@@ -984,11 +989,13 @@ class Emitter {
             emit_instr("mov rdi, ", arg(0));
             emit_instr("add rdi, 8");
             emit_instr("call puts wrt ..plt");
-            emit_instr("; destruct argument");
-            emit_instr("mov rax, ", arg(0));
-            emit_instr("push rax");
-            emit_instr("call ", to_str(ir::builtin_destruct_string));
-            emit_instr("add rsp, 8");
+            if (not disable_destructors) {
+                emit_instr("; destruct argument");
+                emit_instr("mov rax, ", arg(0));
+                emit_instr("push rax");
+                emit_instr("call ", to_str(ir::builtin_destruct_string));
+                emit_instr("add rsp, 8");
+            }
         });
         emit_builtin_func(ir::builtin_readInt, [&] {
             emit_instr("sub rsp, 16");
@@ -1058,8 +1065,9 @@ class Emitter {
     }
 
 public:
-    explicit Emitter(std::ostream& out)
-    : out{out} {}
+    explicit Emitter(std::ostream& out, bool disable_destructors)
+    : out{out}
+    , disable_destructors{disable_destructors} {}
 
     void emit(ir::Program&& prog) && {
         emit_bultins();
@@ -1083,8 +1091,8 @@ public:
 
 namespace backend {
 
-void emit_x86_64(ir::Program&& prog, std::ofstream& out) {
-    Emitter{out}.emit(std::move(prog));
+void emit_x86_64(ir::Program&& prog, std::ofstream& out, bool disable_destructors) {
+    Emitter{out, disable_destructors}.emit(std::move(prog));
 }
 
 } // namespace backend
