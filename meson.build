@@ -71,6 +71,8 @@ latc_x86_64 = executable('latc_x86_64',
         'src/frontend/type_checker.cc',
         'src/ir/ast_to_ir.cc',
         'src/ir/ir_printer.cc',
+        'src/ir/make_ssa.cc',
+        'src/ir/remove_phis.cc',
         'src/latc_x86_64.cc',
     ],
     dependencies : [

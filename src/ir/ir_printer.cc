@@ -12,7 +12,6 @@
 namespace ir {
 
 std::ostream& operator<<(std::ostream& os, const Label& lname) { return os << to_str(lname); }
-std::ostream& operator<<(std::ostream& os, const Var& vname) { return os << 'v' << vname.id; }
 std::ostream& operator<<(std::ostream& os, const FnName& fname) { return os << to_str(fname); }
 std::ostream& operator<<(std::ostream& os, const VTableName& vt_name) {
     return os << to_str(vt_name);
@@ -47,6 +46,13 @@ std::ostream& operator<<(std::ostream& os, const Value& val) {
 }
 
 std::ostream& operator<<(std::ostream& os, Type t) { return os << to_str(t); }
+
+std::ostream& operator<<(std::ostream& os, const VarName& vname) {
+    return os << 'v' << vname.id;
+}
+std::ostream& operator<<(std::ostream& os, const Var& var) {
+    return os << var.type << ' ' << var.name;
+}
 
 std::ostream& operator<<(std::ostream& os, UnaryOp uop) {
     switch (uop) {
@@ -96,27 +102,24 @@ std::ostream& operator<<(std::ostream& os, const ConstMemLoc& cmloc) {
 }
 
 std::ostream& operator<<(std::ostream& os, const ICopy& i) {
-    return os << i.var << ' ' << i.type << " = " << i.val;
+    return os << i.var << " = " << i.val;
 }
 std::ostream& operator<<(std::ostream& os, const IUnaryOp& i) {
-    return os << i.var << ' ' << i.type << " = " << i.op << i.val;
+    return os << i.var << " = " << i.op << i.val;
 }
 std::ostream& operator<<(std::ostream& os, const IBinOp& i) {
-    return os << i.var << ' ' << i.type << " = " << i.left << ' ' << i.op << ' ' << i.right;
+    return os << i.var << " = " << i.left << ' ' << i.op << ' ' << i.right;
 }
 std::ostream& operator<<(std::ostream& os, const ILoad& i) {
-    return os << i.var << ' ' << i.type << " = " << i.loc;
+    return os << i.var << " = " << i.loc;
 }
 std::ostream& operator<<(std::ostream& os, const IConstLoad& i) {
-    return os << i.var << ' ' << i.type << " = " << i.loc;
+    return os << i.var << " = " << i.loc;
 }
 std::ostream& operator<<(std::ostream& os, const IStore& i) {
-    return os << i.loc << ' ' << i.type << " = " << i.val;
+    return os << i.loc << " = " << i.val;
 }
-std::ostream& operator<<(std::ostream& os, const CallArg& call_arg) {
-    return os << call_arg.type << ' ' << call_arg.val;
-}
-std::ostream& operator<<(std::ostream& os, const std::vector<CallArg>& vals) {
+std::ostream& operator<<(std::ostream& os, const std::vector<Value>& vals) {
     bool first = true;
     for (auto const& val : vals) {
         if (first) {
@@ -134,7 +137,7 @@ operator<<(std::ostream& os, const std::variant<FnName, ConstMemLoc>& func) {
     return os;
 }
 std::ostream& operator<<(std::ostream& os, const ICall& i) {
-    return os << i.var << ' ' << i.type << " = " << i.func << '(' << i.args << ')';
+    return os << i.var << " = " << i.func << '(' << i.args << ')';
 }
 std::ostream& operator<<(std::ostream& os, const IVCall& i) {
     return os << i.func << '(' << i.args << ')';
@@ -147,8 +150,8 @@ std::ostream& operator<<(std::ostream& os, const IIfUnaryCond& i) {
               << " else " << i.false_branch;
 }
 std::ostream& operator<<(std::ostream& os, const IIfBinCond& i) {
-    return os << "if " << i.type << ' ' << i.left << ' ' << i.op << ' ' << i.right << " goto "
-              << i.true_branch << " else " << i.false_branch;
+    return os << "if " << i.left << ' ' << i.op << ' ' << i.right << " goto " << i.true_branch
+              << " else " << i.false_branch;
 }
 std::ostream& operator<<(std::ostream& os, const IReturn& i) {
     os << "ret";
@@ -166,24 +169,20 @@ std::ostream& operator<<(std::ostream& os, const Instruction& instr) {
     return os;
 }
 
-std::ostream& operator<<(std::ostream& os, const Phi& phi) {
-    os << phi.var << ' ' << phi.type << " = [";
-    bool first = true;
-    for (auto const& [label, val] : phi.predecessors) {
-        if (first) {
-            first = true;
-        } else {
-            os << ", ";
-        }
-        os << label << ": " << val;
-    }
-    return os << "]";
-}
-
 std::ostream& operator<<(std::ostream& os, const BasicBlock& block) {
     os << ' ' << block.name << ":\n";
-    for (auto const& phi : block.phis) {
-        os << "    " << phi << '\n';
+    for (auto const& [var, predecessors] : block.phis) {
+        os << "    " << var << " = phi [";
+        bool first = true;
+        for (auto const& [label, val] : predecessors) {
+            if (first) {
+                first = false;
+            } else {
+                os << ", ";
+            }
+            os << label << ": " << val;
+        }
+        os << "]\n";
     }
     for (auto const& instr : block.instructions) {
         os << "    " << instr << '\n';
@@ -191,11 +190,7 @@ std::ostream& operator<<(std::ostream& os, const BasicBlock& block) {
     return os;
 }
 
-std::ostream& operator<<(std::ostream& os, const FnArg& farg) {
-    return os << farg.type << ' ' << farg.var;
-}
-
-std::ostream& operator<<(std::ostream& os, const std::vector<FnArg>& fargs) {
+std::ostream& operator<<(std::ostream& os, const std::vector<Var>& fargs) {
     bool first = true;
     for (auto const& arg : fargs) {
         if (first) {

@@ -9,6 +9,7 @@
 #include "src/frontend/type_checker.hh"
 #include "src/ir/ast_to_ir.hh"
 #include "src/ir/ir_printer.hh"
+#include "src/ir/make_ssa.hh"
 
 #include <cerrno>
 #include <cstddef>
@@ -74,6 +75,8 @@ struct Options {
     bool help = false;
     bool emit_ir = false;
     bool disable_destructors = false;
+    bool optimizations = true;
+    bool emit_ir_stages = false;
 };
 
 Options parse_options(int& argc, char** argv) {
@@ -91,6 +94,10 @@ Options parse_options(int& argc, char** argv) {
             res.emit_ir = true;
         } else if (arg == "-disable-destructors" or arg == "--disable-destructors") {
             res.disable_destructors = true;
+        } else if (arg == "-no-optimizations" or arg == "--no-optimizations") {
+            res.optimizations = false;
+        } else if (arg == "-emit-ir-stages" or arg == "--emit-ir-stages") {
+            res.emit_ir_stages = true;
         } else {
             fail("unknown option: '", arg, '\'');
         }
@@ -103,7 +110,8 @@ Options parse_options(int& argc, char** argv) {
 void print_help(const char* prog_name) {
     printf(
         "usage: %s [-h|--help] [-emit-ir|--emit-ir] "
-        "[-disable-destructors|--disable-destructors] <path>\n",
+        "[-disable-destructors|--disable-destructors] [-no-optimizations|--no-optimizations] "
+        "[-emit-ir-stages|--emit-ir-stages] <path>\n",
         prog_name);
 }
 
@@ -166,6 +174,16 @@ int main(int argc, char** argv) {
 
         auto ir_prog =
             ir::translate_ast_to_ir(prog_ast, global_symbols, cmd_options.disable_destructors);
+        if (cmd_options.emit_ir_stages) {
+            std::ofstream{concat(base_path, ".01-translated_ast.ir")} << ir_prog;
+        }
+        if (cmd_options.optimizations) {
+            ir_prog = ir::make_ssa(std::move(ir_prog));
+            if (cmd_options.emit_ir_stages) {
+                std::ofstream{concat(base_path, ".02-as_ssa.ir")} << ir_prog;
+            }
+            // TODO:
+        }
         if (cmd_options.emit_ir) {
             std::ofstream{concat(base_path, ".ir")} << ir_prog;
         }

@@ -22,11 +22,6 @@ struct Label {
 
 inline std::string to_str(const Label& label) { return concat(".L", label.id); }
 
-struct Var {
-    size_t id;
-    DEFINE_CMP_OPERATORS_BY_FIELD(Var, id)
-};
-
 struct ClassName {
     std::string mangled_name;
     DEFINE_CMP_OPERATORS_BY_FIELD(ClassName, mangled_name)
@@ -103,8 +98,6 @@ struct Null {
     friend constexpr bool operator>=(Null /*a*/, Null /*b*/) noexcept { return true; }
 };
 
-using Value = std::variant<Var, int_t, bool, Null, StringConstantName, VTableName>;
-
 enum class Type {
     BOOL,
     INT,
@@ -118,6 +111,32 @@ constexpr const char* to_str(Type type) noexcept {
     case ir::Type::PTR: return "PTR";
     }
     __builtin_unreachable();
+}
+
+struct VarName {
+    size_t id;
+    DEFINE_CMP_OPERATORS_BY_FIELD(VarName, id)
+};
+
+struct Var {
+    VarName name;
+    Type type;
+    DEFINE_CMP_OPERATORS_BY_FIELD(Var, name)
+};
+
+using Value = std::variant<Var, int_t, bool, Null, StringConstantName, VTableName>;
+
+constexpr Type type_of(const Value& val) noexcept {
+    return std::visit(
+        overloaded{
+            [](const Var& var) { return var.type; },
+            [](int_t /*unused*/) { return Type::INT; },
+            [](bool /*unused*/) { return Type::BOOL; },
+            [](Null /*unused*/) { return Type::PTR; },
+            [](const StringConstantName& /*unused*/) { return Type::PTR; },
+            [](const VTableName& /*unused*/) { return Type::PTR; },
+        },
+        val);
 }
 
 enum class UnaryOp {
@@ -142,6 +161,18 @@ enum class RelOp {
     NE,
 };
 
+constexpr RelOp negated(RelOp op) {
+    switch (op) {
+    case RelOp::LTH: return RelOp::GE;
+    case RelOp::LE: return RelOp::GTH;
+    case RelOp::GTH: return RelOp::LE;
+    case RelOp::GE: return RelOp::LTH;
+    case RelOp::EQ: return RelOp::NE;
+    case RelOp::NE: return RelOp::EQ;
+    }
+    __builtin_unreachable();
+}
+
 struct MemLoc {
     std::variant<Var, Null> base;
     size_t displacement;
@@ -155,51 +186,40 @@ struct ConstMemLoc {
 
 struct ICopy {
     Var var;
-    Type type;
     Value val;
 };
 struct IUnaryOp {
     Var var;
-    Type type;
     UnaryOp op;
     Value val;
 };
 struct IBinOp {
     Var var;
-    Type type;
     BinOp op;
     Value left;
     Value right;
 };
 struct ILoad {
     Var var;
-    Type type;
     MemLoc loc;
 };
 // Just like ILoad, but it is guaranteed that the value under loc is always read-only
 struct IConstLoad {
     Var var;
-    Type type;
     ConstMemLoc loc;
 };
 struct IStore {
     MemLoc loc;
-    Type type;
     Value val;
-};
-struct CallArg {
-    Value val;
-    Type type;
 };
 struct ICall {
     Var var;
-    Type type;
     std::variant<FnName, ConstMemLoc> func;
-    std::vector<CallArg> args;
+    std::vector<Value> args;
 };
 struct IVCall {
     std::variant<FnName, ConstMemLoc> func;
-    std::vector<CallArg> args;
+    std::vector<Value> args;
 };
 struct IGoto {
     Label target;
@@ -212,7 +232,6 @@ struct IIfUnaryCond {
 };
 struct IIfBinCond {
     RelOp op;
-    Type type;
     Value left;
     Value right;
     Label true_branch;
@@ -247,27 +266,16 @@ using Instruction = std::variant<
         i);
 }
 
-struct Phi {
-    Var var;
-    Type type;
-    std::map<Label, Value> predecessors;
-};
-
 struct BasicBlock {
     Label name;
-    std::vector<Phi> phis;
+    std::map<Var, std::map<Label, Value>> phis;
     std::vector<Instruction> instructions;
-};
-
-struct FnArg {
-    Var var;
-    Type type;
 };
 
 struct FnDef {
     FnName name;
     std::optional<Type> ret_type;
-    std::vector<FnArg> args;
+    std::vector<Var> args;
     std::vector<BasicBlock> body;
 };
 

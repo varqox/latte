@@ -82,3 +82,4 @@ Are implemented in assembly (using libc) and are pasted at the beginning of ever
 ## Compiler flags <a name="c-flags"></a>
 * `--emit-ir` -- save IR (after applying optimizations) to file (for file `foo/bar.lat` writes IR to `foo/bar.ir`)
 * `--disable-destructors` -- disable destructors (garbage collection implementation)
+* `--no-optimizations` -- disables all optimizations: constant propagation, GCSE, etc.

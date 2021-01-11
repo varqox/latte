@@ -3,6 +3,7 @@
 #include "src/ends_with.hh"
 #include "src/ir/ir.hh"
 #include "src/ir/ir_printer.hh"
+#include "src/ir/remove_phis.hh"
 #include "src/overloaded.hh"
 #include "src/ranges.hh"
 
@@ -133,18 +134,19 @@ class SimpleFnEmitter {
         std::string code;
     };
 
-    VarLocCode var_loc_code(ir::Var var, ir::Type type) {
-        if (var.id < fdef->args.size()) {
+    VarLocCode var_loc_code(ir::Var var) {
+        if (var.name.id < fdef->args.size()) {
             // arg
             return {
-                .code = concat(loc_code_prefix(type), "[rbp + ", 16 + 8 * var.id, ']'),
+                .code =
+                    concat(loc_code_prefix(var.type), "[rbp + ", 16 + 8 * var.name.id, ']'),
             };
         }
         // local variable
-        auto stack_var_id = 1 + var.id - fdef->args.size(); // numbered from 1
+        auto stack_var_id = 1 + var.name.id - fdef->args.size(); // numbered from 1
         stack_size_needed = std::max(stack_size_needed, stack_var_id * 8);
         return {
-            .code = concat(loc_code_prefix(type), "[rbp - ", 8 * stack_var_id, ']'),
+            .code = concat(loc_code_prefix(var.type), "[rbp - ", 8 * stack_var_id, ']'),
         };
     }
 
@@ -338,22 +340,20 @@ class SimpleFnEmitter {
         asmi::Instr instr;
     };
 
-    asmi::Instr set_to(const RegHolder& reg, const ir::Value& val, const ir::Type& type) {
+    asmi::Instr set_to(const RegHolder& reg, const ir::Value& val) {
+        assert(reg.type == type_of(val));
         return std::visit(
             overloaded{
                 [&](const ir::Var& var) -> asmi::Instr {
-                    return asmi::mov{reg, var_loc_code(var, type)};
+                    return asmi::mov{reg, var_loc_code(var)};
                 },
                 [&](int_t i) -> asmi::Instr {
-                    assert(type == ir::Type::INT);
                     return asmi::mov{reg, i};
                 },
                 [&](bool b) -> asmi::Instr {
-                    assert(type == ir::Type::BOOL);
                     return asmi::mov{reg, b ? 1 : 0};
                 },
                 [&](ir::Null /*unused*/) -> asmi::Instr {
-                    assert(type == ir::Type::PTR);
                     return asmi::mov{reg, 0};
                 },
                 [&](const ir::StringConstantName& sc) -> asmi::Instr {
@@ -373,9 +373,8 @@ class SimpleFnEmitter {
             overloaded{
                 [&](const ir::Var& var) {
                     auto& reg = res.taken_regs.emplace_back(some_reg(ir::Type::PTR));
-                    res.preparing_instructions.emplace_back(
-                        std::make_unique<AsmiInstrWrapper>(AsmiInstrWrapper{
-                            .instr = asmi::mov{reg, var_loc_code(var, ir::Type::PTR)}}));
+                    res.preparing_instructions.emplace_back(std::make_unique<AsmiInstrWrapper>(
+                        AsmiInstrWrapper{.instr = asmi::mov{reg, var_loc_code(var)}}));
                     back_insert(res.code, to_asm(reg.reg.value(), ir::Type::PTR));
                 },
                 [&](const ir::Null& /*unused*/) { back_insert(res.code, '0'); },
@@ -391,8 +390,8 @@ class SimpleFnEmitter {
                     [&](const ir::Var& var) {
                         auto& reg = res.taken_regs.emplace_back(some_reg(ir::Type::INT));
                         res.preparing_instructions.emplace_back(
-                            std::make_unique<AsmiInstrWrapper>(AsmiInstrWrapper{
-                                .instr = asmi::mov{reg, var_loc_code(var, ir::Type::INT)}}));
+                            std::make_unique<AsmiInstrWrapper>(
+                                AsmiInstrWrapper{.instr = asmi::mov{reg, var_loc_code(var)}}));
                         back_insert(res.code, to_asm(reg.reg.value(), ir::Type::PTR));
                     },
                     [&](int_t i) { back_insert(res.code, i); },
@@ -560,10 +559,10 @@ class SimpleFnEmitter {
         }
         auto emit_call = [this](
                              const std::variant<ir::FnName, ir::ConstMemLoc>& func,
-                             const std::vector<ir::CallArg>& args) {
+                             const std::vector<ir::Value>& args) {
             for (auto const& arg : reverse_view(args)) {
-                auto reg = some_reg(arg.type);
-                emit_instr(set_to(reg, arg.val, arg.type));
+                auto reg = some_reg(type_of(arg));
+                emit_instr(set_to(reg, arg));
                 emit_instr(asmi::push{reg});
             }
             std::visit(
@@ -579,25 +578,27 @@ class SimpleFnEmitter {
         std::visit(
             overloaded{
                 [&](ir::ICopy& i) {
-                    auto reg = some_reg(i.type);
-                    emit_instr(set_to(reg, i.val, i.type));
-                    emit_instr(asmi::mov{var_loc_code(i.var, i.type), reg});
+                    auto reg = some_reg(i.var.type);
+                    emit_instr(set_to(reg, i.val));
+                    emit_instr(asmi::mov{var_loc_code(i.var), reg});
                 },
                 [&](ir::IUnaryOp& i) {
-                    auto reg = some_reg(i.type);
-                    emit_instr(set_to(reg, i.val, i.type));
+                    auto reg = some_reg(i.var.type);
+                    emit_instr(set_to(reg, i.val));
                     switch (i.op) {
                     case ir::UnaryOp::NEG: emit_instr(asmi::neg{reg}); break;
                     case ir::UnaryOp::NOT: emit_instr(asmi::xor_{reg, 1}); break;
                     }
-                    emit_instr(asmi::mov{var_loc_code(i.var, i.type), reg});
+                    emit_instr(asmi::mov{var_loc_code(i.var), reg});
                 },
                 [&](ir::IBinOp& i) {
-                    auto lreg = specific_reg(i.type, RAX);
-                    auto rdx = specific_reg(i.type, RDX);
-                    emit_instr(set_to(lreg, i.left, i.type));
-                    auto rreg = some_reg(i.type);
-                    emit_instr(set_to(rreg, i.right, i.type));
+                    auto rdx = specific_reg(i.var.type, RDX);
+                    auto lreg = specific_reg(i.var.type, RAX);
+                    assert(i.var.type == type_of(i.left));
+                    emit_instr(set_to(lreg, i.left));
+                    auto rreg = some_reg(i.var.type);
+                    assert(i.var.type == type_of(i.right));
+                    emit_instr(set_to(rreg, i.right));
                     switch (i.op) {
                     case ir::BinOp::ADD: emit_instr(asmi::add{lreg, rreg}); break;
                     case ir::BinOp::SUB: emit_instr(asmi::sub{lreg, rreg}); break;
@@ -614,27 +615,28 @@ class SimpleFnEmitter {
                         lreg = std::move(rdx);
                     } break;
                     }
-                    emit_instr(asmi::mov{var_loc_code(i.var, i.type), lreg});
+                    emit_instr(asmi::mov{var_loc_code(i.var), lreg});
                 },
                 [&](ir::ILoad& i) {
-                    auto reg = some_reg(i.type);
-                    emit_instr(asmi::mov{reg, mloc_code(i.loc, i.type)});
-                    emit_instr(asmi::mov{var_loc_code(i.var, i.type), reg});
+                    auto reg = some_reg(i.var.type);
+                    emit_instr(asmi::mov{reg, mloc_code(i.loc, i.var.type)});
+                    emit_instr(asmi::mov{var_loc_code(i.var), reg});
                 },
                 [&](ir::IConstLoad& i) {
-                    auto reg = some_reg(i.type);
-                    emit_instr(asmi::mov{reg, mloc_code(i.loc, i.type)});
-                    emit_instr(asmi::mov{var_loc_code(i.var, i.type), reg});
+                    auto reg = some_reg(i.var.type);
+                    emit_instr(asmi::mov{reg, mloc_code(i.loc, i.var.type)});
+                    emit_instr(asmi::mov{var_loc_code(i.var), reg});
                 },
                 [&](ir::IStore& i) {
-                    auto reg = some_reg(i.type);
-                    emit_instr(set_to(reg, i.val, i.type));
-                    emit_instr(asmi::mov{mloc_code(i.loc, i.type), reg});
+                    auto val_type = type_of(i.val);
+                    auto reg = some_reg(val_type);
+                    emit_instr(set_to(reg, i.val));
+                    emit_instr(asmi::mov{mloc_code(i.loc, val_type), reg});
                 },
                 [&](ir::ICall& i) {
-                    auto rax = specific_reg(i.type, RAX);
+                    auto rax = specific_reg(i.var.type, RAX);
                     emit_call(i.func, i.args);
-                    emit_instr(asmi::mov{var_loc_code(i.var, i.type), rax});
+                    emit_instr(asmi::mov{var_loc_code(i.var), rax});
                 },
                 [&](ir::IVCall& i) { emit_call(i.func, i.args); },
                 [&](ir::IGoto& i) {
@@ -644,7 +646,7 @@ class SimpleFnEmitter {
                 },
                 [&](ir::IIfUnaryCond& i) {
                     auto reg = some_reg(ir::Type::BOOL);
-                    emit_instr(asmi::mov{reg, var_loc_code(i.cond, ir::Type::BOOL)});
+                    emit_instr(asmi::mov{reg, var_loc_code(i.cond)});
                     emit_instr(asmi::test{reg, reg});
                     if (i.negate_cond) {
                         emit_instr(asmi::jz{i.true_branch});
@@ -656,12 +658,16 @@ class SimpleFnEmitter {
                     }
                 },
                 [&](ir::IIfBinCond& i) {
-                    auto lreg = some_reg(i.type);
-                    emit_instr(set_to(lreg, i.left, i.type));
-                    auto rreg = some_reg(i.type);
-                    emit_instr(set_to(rreg, i.right, i.type));
+                    auto ltype = type_of(i.left);
+                    auto rtype = type_of(i.right);
+                    assert(ltype == rtype);
+
+                    auto lreg = some_reg(ltype);
+                    auto rreg = some_reg(rtype);
+                    emit_instr(set_to(lreg, i.left));
+                    emit_instr(set_to(rreg, i.right));
                     emit_instr(asmi::cmp{lreg, rreg});
-                    switch (i.type) {
+                    switch (ltype) {
                     case ir::Type::INT: {
                         switch (i.op) {
                         case ir::RelOp::LTH: emit_instr(asmi::jl{i.true_branch}); break;
@@ -690,9 +696,8 @@ class SimpleFnEmitter {
                 },
                 [&](ir::IReturn& i) {
                     if (i.val) {
-                        auto type = fdef->ret_type.value();
-                        auto rax = specific_reg(type, RAX);
-                        emit_instr(set_to(rax, *i.val, type));
+                        auto rax = specific_reg(type_of(*i.val), RAX);
+                        emit_instr(set_to(rax, *i.val));
                     }
                     if (next_bblock_name != std::nullopt) {
                         emit_instr(asmi::jmp{epilogue_label});
@@ -714,12 +719,12 @@ class SimpleFnEmitter {
 public:
     SimpleFnEmitter() = default;
 
-    void emit(std::ostream& out, ir::FnDef& fn) && {
+    void emit(std::ostream& out, ir::FnDef&& fn) && {
         fdef = &fn;
         {
             size_t i = 0;
             for (auto& arg : fn.args) {
-                assert(arg.var.id == i);
+                assert(arg.name.id == i);
                 ++i;
             }
         }
@@ -1059,9 +1064,9 @@ class Emitter {
         });
     }
 
-    void emit(ir::FnDef& fn) {
+    void emit(ir::FnDef&& fn) {
         out << '\n';
-        SimpleFnEmitter{}.emit(out, fn);
+        SimpleFnEmitter{}.emit(out, remove_phis(std::move(fn)));
     }
 
 public:
@@ -1082,7 +1087,7 @@ public:
                ";;;;";
         out << "\nsection .text\n";
         for (auto& fn : prog.functions) {
-            emit(fn);
+            emit(std::move(fn));
         }
     }
 };

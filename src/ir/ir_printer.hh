@@ -11,7 +11,6 @@
 namespace ir {
 
 std::ostream& operator<<(std::ostream& os, const Label& lname);
-std::ostream& operator<<(std::ostream& os, const Var& vname);
 std::ostream& operator<<(std::ostream& os, const FnName& fname);
 std::ostream& operator<<(std::ostream& os, const VTableName& vt_name);
 std::ostream& operator<<(std::ostream& os, const VTable& vt);
@@ -22,6 +21,9 @@ std::ostream& operator<<(std::ostream& os, const Null& /*unused*/);
 std::ostream& operator<<(std::ostream& os, const Value& val);
 
 std::ostream& operator<<(std::ostream& os, Type t);
+
+std::ostream& operator<<(std::ostream& os, const VarName& vname);
+std::ostream& operator<<(std::ostream& os, const Var& var);
 
 std::ostream& operator<<(std::ostream& os, UnaryOp uop);
 
@@ -38,8 +40,7 @@ std::ostream& operator<<(std::ostream& os, const IBinOp& i);
 std::ostream& operator<<(std::ostream& os, const ILoad& i);
 std::ostream& operator<<(std::ostream& os, const IConstLoad& i);
 std::ostream& operator<<(std::ostream& os, const IStore& i);
-std::ostream& operator<<(std::ostream& os, const CallArg& call_arg);
-std::ostream& operator<<(std::ostream& os, const std::vector<CallArg>& vals);
+std::ostream& operator<<(std::ostream& os, const std::vector<Value>& vals);
 std::ostream& operator<<(std::ostream& os, const ICall& i);
 std::ostream& operator<<(std::ostream& os, const IVCall& i);
 std::ostream& operator<<(std::ostream& os, const IGoto& i);
@@ -50,13 +51,9 @@ std::ostream& operator<<(std::ostream& os, const IUnreachable& i);
 
 std::ostream& operator<<(std::ostream& os, const Instruction& instr);
 
-std::ostream& operator<<(std::ostream& os, const Phi& phi);
-
 std::ostream& operator<<(std::ostream& os, const BasicBlock& block);
 
-std::ostream& operator<<(std::ostream& os, const FnArg& farg);
-
-std::ostream& operator<<(std::ostream& os, const std::vector<FnArg>& fargs);
+std::ostream& operator<<(std::ostream& os, const std::vector<Var>& fargs);
 
 std::ostream& operator<<(std::ostream& os, const FnDef& fdef);
 
