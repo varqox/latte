@@ -112,7 +112,9 @@ class TypeChecker {
         return is_array_type(t) or is_class_type(t);
     }
 
-    [[nodiscard]] bool is_convertible_to(const Type& src, const Type& dest) const noexcept {
+    [[nodiscard]] bool is_convertible_to(const Type& src, const Type& dest) const {
+        check_type_correctness(src);
+        check_type_correctness(dest);
         return std::visit(
             overloaded{
                 [&](const Type::TNull& /*unused*/) { return src == ast::type_null; },
