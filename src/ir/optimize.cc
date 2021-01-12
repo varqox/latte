@@ -1,4 +1,5 @@
 #include "src/ir/optimize.hh"
+#include "src/ir/eliminate_dead_code.hh"
 #include "src/ir/ir.hh"
 #include "src/ir/propagate_constants.hh"
 
@@ -12,11 +13,6 @@ global_subexpression_elimination(std::vector<BasicBlock>&& body) {
 [[nodiscard]] static std::vector<BasicBlock>
 remove_unnecessary_phis(std::vector<BasicBlock>&& body) {
     return std::move(body); // TODO:
-}
-
-[[nodiscard]] static std::vector<BasicBlock>
-eliminate_dead_code(std::vector<BasicBlock>&& body) {
-    return std::move(body); // TODO: first blocks, then variables
 }
 
 [[nodiscard]] static FnDef optimize(FnDef&& fdef) {
