@@ -178,57 +178,105 @@ struct MemLoc {
     size_t displacement;
     size_t scale;
     std::variant<Var, int_t> index;
+
+    friend bool operator==(const MemLoc& a, const MemLoc& b) {
+        return a.base == b.base and a.displacement == b.displacement and a.scale == b.scale and
+            a.index == b.index;
+    }
 };
 
 struct ConstMemLoc {
     MemLoc loc;
+
+    friend bool operator==(const ConstMemLoc& a, const ConstMemLoc& b) {
+        return a.loc == b.loc;
+    }
 };
 
 struct ICopy {
     Var var;
     Value val;
+
+    friend bool operator==(const ICopy& a, const ICopy& b) {
+        return a.var == b.var and a.val == b.val;
+    }
 };
 struct IUnaryOp {
     Var var;
     UnaryOp op;
     Value val;
+
+    friend bool operator==(const IUnaryOp& a, const IUnaryOp& b) {
+        return a.var == b.var and a.op == b.op and a.val == b.val;
+    }
 };
 struct IBinOp {
     Var var;
     BinOp op;
     Value left;
     Value right;
+
+    friend bool operator==(const IBinOp& a, const IBinOp& b) {
+        return a.var == b.var and a.op == b.op and a.left == b.left and a.right == b.right;
+    }
 };
 struct ILoad {
     Var var;
     MemLoc loc;
+
+    friend bool operator==(const ILoad& a, const ILoad& b) {
+        return a.var == b.var and a.loc == b.loc;
+    }
 };
 // Just like ILoad, but it is guaranteed that the value under loc is always read-only
 struct IConstLoad {
     Var var;
     ConstMemLoc loc;
+
+    friend bool operator==(const IConstLoad& a, const IConstLoad& b) {
+        return a.var == b.var and a.loc == b.loc;
+    }
 };
 struct IStore {
     MemLoc loc;
     Value val;
+
+    friend bool operator==(const IStore& a, const IStore& b) {
+        return a.loc == b.loc and a.val == b.val;
+    }
 };
 struct ICall {
     Var var;
     std::variant<FnName, ConstMemLoc> func;
     std::vector<Value> args;
+
+    friend bool operator==(const ICall& a, const ICall& b) {
+        return a.var == b.var and a.func == b.func and a.args == b.args;
+    }
 };
 struct IVCall {
     std::variant<FnName, ConstMemLoc> func;
     std::vector<Value> args;
+
+    friend bool operator==(const IVCall& a, const IVCall& b) {
+        return a.func == b.func and a.args == b.args;
+    }
 };
 struct IGoto {
     Label target;
+
+    friend bool operator==(const IGoto& a, const IGoto& b) { return a.target == b.target; }
 };
 struct IIfUnaryCond {
     bool negate_cond;
     Var cond;
     Label true_branch;
     Label false_branch;
+
+    friend bool operator==(const IIfUnaryCond& a, const IIfUnaryCond& b) {
+        return a.negate_cond == b.negate_cond and a.cond == b.cond and
+            a.true_branch == b.true_branch and a.false_branch == b.false_branch;
+    }
 };
 struct IIfBinCond {
     RelOp op;
@@ -236,11 +284,22 @@ struct IIfBinCond {
     Value right;
     Label true_branch;
     Label false_branch;
+
+    friend bool operator==(const IIfBinCond& a, const IIfBinCond& b) {
+        return a.op == b.op and a.left == b.left and a.right == b.right and
+            a.true_branch == b.true_branch and a.false_branch == b.false_branch;
+    }
 };
 struct IReturn {
     std::optional<Value> val;
+
+    friend bool operator==(const IReturn& a, const IReturn& b) { return a.val == b.val; }
 };
-struct IUnreachable {};
+struct IUnreachable {
+    friend bool operator==(const IUnreachable& /*a*/, const IUnreachable& /*b*/) {
+        return true;
+    }
+};
 
 using Instruction = std::variant<
     ICopy, IUnaryOp, IBinOp, ILoad, IConstLoad, IStore, ICall, IVCall, IGoto, IIfUnaryCond,
@@ -270,6 +329,10 @@ struct BasicBlock {
     Label name;
     std::map<Var, std::map<Label, Value>> phis;
     std::vector<Instruction> instructions;
+
+    friend bool operator==(const BasicBlock& a, const BasicBlock& b) {
+        return a.name == b.name and a.phis == b.phis and a.instructions == b.instructions;
+    }
 };
 
 struct FnDef {

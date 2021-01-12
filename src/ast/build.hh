@@ -6,6 +6,6 @@
 namespace ast {
 
 // On error throws frontend::ErrorPrinter::ErrorOccurred
-Program build(const std::string& file_contents, frontend::ErrorPrinter& errp);
+[[nodiscard]] Program build(const std::string& file_contents, frontend::ErrorPrinter& errp);
 
 } // namespace ast

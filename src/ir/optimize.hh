@@ -4,6 +4,6 @@
 
 namespace ir {
 
-[[nodiscard]] FnDef remove_phis(FnDef&& fdef);
+[[nodiscard]] Program optimize(Program&& prog);
 
 } // namespace ir

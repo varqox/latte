@@ -6,6 +6,7 @@
 namespace frontend {
 
 // On error throws frontend::ErrorPrinter::ErrorOccurred
-ast::GlobalSymbols collect_global_symbols(const ast::Program& prog, ErrorPrinter& errp);
+[[nodiscard]] ast::GlobalSymbols
+collect_global_symbols(const ast::Program& prog, ErrorPrinter& errp);
 
 } // namespace frontend

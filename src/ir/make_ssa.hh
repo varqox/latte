@@ -4,6 +4,6 @@
 
 namespace ir {
 
-Program make_ssa(Program&& prog);
+[[nodiscard]] Program make_ssa(Program&& prog);
 
 } // namespace ir

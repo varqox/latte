@@ -10,6 +10,7 @@
 #include "src/ir/ast_to_ir.hh"
 #include "src/ir/ir_printer.hh"
 #include "src/ir/make_ssa.hh"
+#include "src/ir/optimize.hh"
 
 #include <cerrno>
 #include <cstddef>
@@ -182,7 +183,10 @@ int main(int argc, char** argv) {
             if (cmd_options.emit_ir_stages) {
                 std::ofstream{concat(base_path, ".02-as_ssa.ir")} << ir_prog;
             }
-            // TODO:
+            ir_prog = ir::optimize(std::move(ir_prog));
+            if (cmd_options.emit_ir_stages) {
+                std::ofstream{concat(base_path, ".03-optimized.ir")} << ir_prog;
+            }
         }
         if (cmd_options.emit_ir) {
             std::ofstream{concat(base_path, ".ir")} << ir_prog;
