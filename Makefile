@@ -46,6 +46,7 @@ LATC_SOURCES := $(BNFC_SRCS) \
 	src/ir/make_ssa.cc \
 	src/ir/optimize.cc \
 	src/ir/propagate_constants.cc \
+	src/ir/propagate_copies.cc \
 	src/ir/remove_phis.cc \
 	src/latc_x86_64.cc \
 

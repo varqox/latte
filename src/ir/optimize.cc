@@ -2,6 +2,7 @@
 #include "src/ir/eliminate_dead_code.hh"
 #include "src/ir/ir.hh"
 #include "src/ir/propagate_constants.hh"
+#include "src/ir/propagate_copies.hh"
 
 namespace ir {
 
@@ -19,9 +20,10 @@ remove_unnecessary_phis(std::vector<BasicBlock>&& body) {
     while (true) {
         auto new_body = fdef.body;
         new_body = propagate_constants(std::move(new_body));
-        new_body = global_subexpression_elimination(std::move(new_body));
+        new_body = propagate_copies(std::move(new_body));
         new_body = remove_unnecessary_phis(std::move(new_body));
         new_body = eliminate_dead_code(std::move(new_body));
+        new_body = global_subexpression_elimination(std::move(new_body));
         if (new_body == fdef.body) {
             break;
         }
