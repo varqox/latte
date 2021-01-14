@@ -578,9 +578,11 @@ class SimpleFnEmitter {
         std::visit(
             overloaded{
                 [&](ir::ICopy& i) {
-                    auto reg = some_reg(i.var.type);
-                    emit_instr(set_to(reg, i.val));
-                    emit_instr(asmi::mov{var_loc_code(i.var), reg});
+                    if (ir::Value{i.var} != i.val) {
+                        auto reg = some_reg(i.var.type);
+                        emit_instr(set_to(reg, i.val));
+                        emit_instr(asmi::mov{var_loc_code(i.var), reg});
+                    }
                 },
                 [&](ir::IUnaryOp& i) {
                     auto reg = some_reg(i.var.type);
