@@ -5,6 +5,7 @@
 - classes with inheritance and virtual methods
 - null implicitly converts to any array and to any class
 - destructors (garbage collection); can be disabled -- see [Compiler flags](#c-flags).
+- GCSE (global common subexpression elimination)
 
 ## Language semantics
 - variables namespace is independent of the functions (and methods) namespace, e.g. (accepted code):

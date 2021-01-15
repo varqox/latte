@@ -41,8 +41,10 @@ LATC_SOURCES := $(BNFC_SRCS) \
 	src/frontend/static_analyzer.cc \
 	src/frontend/type_checker.cc \
 	src/ir/ast_to_ir.cc \
+	src/ir/bblock_pred_succ_info.cc \
 	src/ir/eliminate_dead_code.cc \
 	src/ir/eliminate_unnecessary_phis.cc \
+	src/ir/global_subexpression_elimination.cc \
 	src/ir/ir_printer.cc \
 	src/ir/make_ssa.cc \
 	src/ir/optimize.cc \

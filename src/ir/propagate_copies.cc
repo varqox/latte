@@ -43,14 +43,6 @@ std::vector<BasicBlock> propagate_copies(std::vector<BasicBlock>&& body) {
             mloc.index);
     };
     auto reduce_cmloc = [&](ConstMemLoc& cmloc) { reduce_mloc(cmloc.loc); };
-    auto reduce_func = [&](decltype(ICall::func)& func) {
-        std::visit(
-            overloaded{
-                [&](FnName& /*unused*/) {},
-                [&](ConstMemLoc& cmloc) { reduce_cmloc(cmloc); },
-            },
-            func);
-    };
     auto reduce_val = [&](Value& val) {
         std::visit(
             overloaded{
@@ -62,6 +54,15 @@ std::vector<BasicBlock> propagate_copies(std::vector<BasicBlock>&& body) {
                 [&](VTableName& /*unused*/) {},
             },
             val);
+    };
+    auto reduce_func = [&](decltype(ICall::func)& func) {
+        std::visit(
+            overloaded{
+                [&](FnName& /*unused*/) {},
+                [&](ConstMemLoc& cmloc) { reduce_cmloc(cmloc); },
+                [&](Value& val) { reduce_val(val); },
+            },
+            func);
     };
     auto reduce_instr = [&](Instruction& instr) {
         std::visit(

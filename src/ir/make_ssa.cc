@@ -91,15 +91,17 @@ class SSAMaker {
         return std::move(vals);
     }
 
-    std::variant<ir::FnName, ir::ConstMemLoc>
-    make_ssa(NewBasicBlock& nbb, std::variant<ir::FnName, ir::ConstMemLoc>&& fname) {
+    decltype(ir::ICall::func) make_ssa(NewBasicBlock& nbb, decltype(ir::ICall::func)&& fname) {
         return std::visit(
             overloaded{
-                [&](ir::FnName&& fname) -> std::variant<ir::FnName, ir::ConstMemLoc> {
+                [&](ir::FnName&& fname) -> decltype(ir::ICall::func) {
                     return std::move(fname);
                 },
-                [&](ir::ConstMemLoc&& cmloc) -> std::variant<ir::FnName, ir::ConstMemLoc> {
+                [&](ir::ConstMemLoc&& cmloc) -> decltype(ir::ICall::func) {
                     return make_ssa(nbb, cmloc);
+                },
+                [&](ir::Value&& val) -> decltype(ir::ICall::func) {
+                    return make_ssa(nbb, std::move(val));
                 },
             },
             std::move(fname));

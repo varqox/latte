@@ -183,6 +183,11 @@ struct MemLoc {
         return a.base == b.base and a.displacement == b.displacement and a.scale == b.scale and
             a.index == b.index;
     }
+
+    friend bool operator<(const MemLoc& a, const MemLoc& b) {
+        return std::tuple{a.base, a.displacement, a.scale, a.index} <
+            std::tuple{b.base, b.displacement, b.scale, b.index};
+    }
 };
 
 struct ConstMemLoc {
@@ -191,6 +196,8 @@ struct ConstMemLoc {
     friend bool operator==(const ConstMemLoc& a, const ConstMemLoc& b) {
         return a.loc == b.loc;
     }
+
+    friend bool operator<(const ConstMemLoc& a, const ConstMemLoc& b) { return a.loc < b.loc; }
 };
 
 struct ICopy {
@@ -247,7 +254,7 @@ struct IStore {
 };
 struct ICall {
     Var var;
-    std::variant<FnName, ConstMemLoc> func;
+    std::variant<FnName, ConstMemLoc, Value> func;
     std::vector<Value> args;
 
     friend bool operator==(const ICall& a, const ICall& b) {
@@ -255,7 +262,7 @@ struct ICall {
     }
 };
 struct IVCall {
-    std::variant<FnName, ConstMemLoc> func;
+    std::variant<FnName, ConstMemLoc, Value> func;
     std::vector<Value> args;
 
     friend bool operator==(const IVCall& a, const IVCall& b) {

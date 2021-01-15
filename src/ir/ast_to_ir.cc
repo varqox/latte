@@ -1428,7 +1428,7 @@ class AstTranslator {
         };
 
         struct MakeFnNameAndArgsRes {
-            std::variant<ir::FnName, ir::ConstMemLoc> func;
+            decltype(ir::ICall::func) func;
             std::vector<ir::Value> args;
             List<ir::Instruction> other_destructors;
         };

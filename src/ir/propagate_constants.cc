@@ -123,11 +123,13 @@ class ConstantPropagator {
                 },
                 val);
         };
-        auto prepare_func = [&](std::variant<ir::FnName, ir::ConstMemLoc>& func) {
+        auto prepare_func = [&](decltype(ir::ICall::func)& func) {
             std::visit(
                 overloaded{
-                    [&](const ir::FnName& /*unused*/) {},
-                    [&](ir::ConstMemLoc& cmloc) { prepare_cmloc(cmloc); }},
+                    [&](ir::FnName& /*unused*/) {},
+                    [&](ir::ConstMemLoc& cmloc) { prepare_cmloc(cmloc); },
+                    [&](ir::Value& val) { prepare_val(val); },
+                },
                 func);
         };
         std::visit(
@@ -291,7 +293,9 @@ class ConstantPropagator {
                 [&](ir::ConstMemLoc&& cmloc) -> decltype(ir::ICall::func) {
                     return reduce(std::move(cmloc)); // NOLINT(performance-move-const-arg)
                 },
-            },
+                [&](ir::Value&& val) -> decltype(ir::ICall::func) {
+                    return reduce(std::move(val));
+                }},
             std::move(func));
     }
 

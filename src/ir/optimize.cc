@@ -1,16 +1,12 @@
 #include "src/ir/optimize.hh"
 #include "src/ir/eliminate_dead_code.hh"
 #include "src/ir/eliminate_unnecessary_phis.hh"
+#include "src/ir/global_subexpression_elimination.hh"
 #include "src/ir/ir.hh"
 #include "src/ir/propagate_constants.hh"
 #include "src/ir/propagate_copies.hh"
 
 namespace ir {
-
-[[nodiscard]] static std::vector<BasicBlock>
-global_subexpression_elimination(std::vector<BasicBlock>&& body) {
-    return std::move(body); // TODO:
-}
 
 [[nodiscard]] static FnDef optimize(FnDef&& fdef) {
     while (true) {

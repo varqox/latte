@@ -131,8 +131,7 @@ std::ostream& operator<<(std::ostream& os, const std::vector<Value>& vals) {
     }
     return os;
 }
-inline std::ostream&
-operator<<(std::ostream& os, const std::variant<FnName, ConstMemLoc>& func) {
+inline std::ostream& operator<<(std::ostream& os, const decltype(ICall::func)& func) {
     std::visit([&](auto const& x) { os << x; }, func);
     return os;
 }

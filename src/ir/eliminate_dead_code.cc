@@ -1,4 +1,5 @@
 #include "src/ir/eliminate_dead_code.hh"
+#include "src/ir/bblock_pred_succ_info.hh"
 #include "src/ir/ir.hh"
 #include "src/overloaded.hh"
 
@@ -7,70 +8,6 @@
 #include <set>
 #include <variant>
 #include <vector>
-
-namespace {
-
-struct BBInfo {
-    ir::BasicBlock* bblock;
-    std::set<ir::Label> predecessors;
-    std::vector<ir::Label> successors;
-};
-
-std::map<ir::Label, BBInfo> bblocks_pred_succ_info(std::vector<ir::BasicBlock>& body) {
-    std::map<ir::Label, BBInfo> bbinfos;
-    for (auto& bblock : body) {
-        std::vector<ir::Label> successors;
-        assert(!bblock.instructions.empty());
-        std::visit(
-            overloaded{
-                [&](const ir::ICopy& /*unused*/) { std::abort(); },
-                [&](const ir::IUnaryOp& /*unused*/) { std::abort(); },
-                [&](const ir::IBinOp& /*unused*/) { std::abort(); },
-                [&](const ir::ILoad& /*unused*/) { std::abort(); },
-                [&](const ir::IConstLoad& /*unused*/) { std::abort(); },
-                [&](const ir::IStore& /*unused*/) { std::abort(); },
-                [&](const ir::ICall& /*unused*/) { std::abort(); },
-                [&](const ir::IVCall& /*unused*/) { std::abort(); },
-                [&](const ir::IGoto& i) { successors.emplace_back(i.target); },
-                [&](const ir::IIfUnaryCond& i) {
-                    successors.emplace_back(i.true_branch);
-                    if (i.false_branch != i.true_branch) {
-                        successors.emplace_back(i.false_branch);
-                    }
-                },
-                [&](const ir::IIfBinCond& i) {
-                    successors.emplace_back(i.true_branch);
-                    if (i.false_branch != i.true_branch) {
-                        successors.emplace_back(i.false_branch);
-                    }
-                },
-                [&](const ir::IReturn& /*unused*/) {
-                    // Nothing to do
-                },
-                [&](const ir::IUnreachable& /*unused*/) {
-                    // Nothing to do
-                },
-            },
-            bblock.instructions.back());
-
-        bbinfos.emplace(
-            bblock.name,
-            BBInfo{
-                .bblock = &bblock,
-                .predecessors = {},
-                .successors = std::move(successors),
-            });
-    }
-    // Fill predecessors
-    for (auto const& [name, bbi] : bbinfos) {
-        for (auto pred : bbi.successors) {
-            bbinfos.at(pred).predecessors.emplace(name);
-        }
-    }
-    return bbinfos;
-}
-
-} // namespace
 
 namespace ir {
 
@@ -134,14 +71,6 @@ static void eliminate_dead_variables(std::vector<BasicBlock>& body) {
             mloc.index);
     };
     auto process_cmloc = [&](const ConstMemLoc& cmloc) { process_mloc(cmloc.loc); };
-    auto process_func = [&](const decltype(ICall::func)& func) {
-        std::visit(
-            overloaded{
-                [&](const FnName& /*unused*/) {},
-                [&](const ConstMemLoc& cmloc) { process_cmloc(cmloc); },
-            },
-            func);
-    };
     auto process_val = [&](const Value& val) {
         std::visit(
             overloaded{
@@ -153,6 +82,15 @@ static void eliminate_dead_variables(std::vector<BasicBlock>& body) {
                 [&](const VTableName& /*unused*/) {},
             },
             val);
+    };
+    auto process_func = [&](const decltype(ICall::func)& func) {
+        std::visit(
+            overloaded{
+                [&](const FnName& /*unused*/) {},
+                [&](const ConstMemLoc& cmloc) { process_cmloc(cmloc); },
+                [&](const Value& val) { process_val(val); },
+            },
+            func);
     };
     auto process_instr = [&](const Instruction& instr) {
         std::visit(

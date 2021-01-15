@@ -325,11 +325,14 @@ class SimpleFnEmitter {
             uint64_t how_much;
         };
         struct call {
-            std::variant<std::tuple<ir::FnName>, std::tuple<MemLocCode>> val;
+            std::variant<std::tuple<ir::FnName>, std::tuple<MemLocCode>, std::tuple<RegVal>>
+                val;
             explicit call(ir::FnName a)
             : val{std::move(a)} {}
             explicit call(MemLocCode a)
             : val{std::move(a)} {}
+            explicit call(RegVal a)
+            : val{a} {}
         };
         using Instr = std::variant<
             mov, lea, neg, xor_, add, sub, imul, cdq, idiv, test, cmp, jmp, jz, jnz, jl, jle,
@@ -539,6 +542,11 @@ class SimpleFnEmitter {
                             }
                             back_insert(curr_instr, "call ", mlc.code);
                         },
+                        [&](const std::tuple<RegVal>& tp) {
+                            auto const& [reg] = tp;
+                            back_insert(curr_instr, "call ");
+                            self(self, reg);
+                        },
                     },
                     x.val);
             } else {
@@ -557,24 +565,28 @@ class SimpleFnEmitter {
             stream << instr;
             back_insert(code, "\t; ", stream.str(), '\n');
         }
-        auto emit_call = [this](
-                             const std::variant<ir::FnName, ir::ConstMemLoc>& func,
-                             const std::vector<ir::Value>& args) {
-            for (auto const& arg : reverse_view(args)) {
-                auto reg = some_reg(type_of(arg));
-                emit_instr(set_to(reg, arg));
-                emit_instr(asmi::push{reg});
-            }
-            std::visit(
-                overloaded{
-                    [&](const ir::FnName& fname) { emit_instr(asmi::call{fname}); },
-                    [&](const ir::ConstMemLoc& mloc) {
-                        emit_instr(asmi::call{mloc_code(mloc, ir::Type::PTR)});
+        auto emit_call =
+            [this](const decltype(ir::ICall::func)& func, const std::vector<ir::Value>& args) {
+                for (auto const& arg : reverse_view(args)) {
+                    auto reg = some_reg(type_of(arg));
+                    emit_instr(set_to(reg, arg));
+                    emit_instr(asmi::push{reg});
+                }
+                std::visit(
+                    overloaded{
+                        [&](const ir::FnName& fname) { emit_instr(asmi::call{fname}); },
+                        [&](const ir::ConstMemLoc& mloc) {
+                            emit_instr(asmi::call{mloc_code(mloc, ir::Type::PTR)});
+                        },
+                        [&](const ir::Value& val) {
+                            auto reg = some_reg(type_of(val));
+                            emit_instr(set_to(reg, val));
+                            emit_instr(asmi::call{reg});
+                        },
                     },
-                },
-                func);
-            emit_instr(asmi::add_rsp{args.size() * 8});
-        };
+                    func);
+                emit_instr(asmi::add_rsp{args.size() * 8});
+            };
         std::visit(
             overloaded{
                 [&](ir::ICopy& i) {
