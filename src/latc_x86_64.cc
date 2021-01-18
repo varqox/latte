@@ -199,6 +199,7 @@ int main(int argc, char** argv) {
         }
         auto obj_file_path = concat(base_path, ".o");
         execute("nasm", {"-f", "elf64", "-g", asm_file_path, "-o", obj_file_path});
+        execute("strip", {"--discard-all", obj_file_path});
         execute("gcc", {obj_file_path, "-o", base_path});
 
         std::cerr << "OK\n" << error_printer.get_all_diagnostics();

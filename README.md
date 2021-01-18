@@ -52,6 +52,7 @@ make
 
 ## Used tools
 Project is implemented in C++17. For parsing BNFC with C backend was used.
+For compiling assembly `NASM` is used. For stripping symbols `strip` command is used. For linking `gcc` is used.
 
 ## Project structure
 - my tests in folders `good/`, `bad/`, `warnings/`
@@ -87,6 +88,11 @@ Project is implemented in C++17. For parsing BNFC with C backend was used.
 
 ## Backend
 Compiler backend is x86_64 in Intel flavor (NASM is used for assembly). So far it is quite simple and without optimizations. Nonetheless, everything (including memory reclaiming) seems to work.
+
+Compilation of assembly is done in three steps:
+- running `NASM` to compile assembly into an object file (`*.o`)
+- stripping local symbols using `strip` because `NASM` always puts local labels into the symbol table which is totally unnecessary
+- linking object file into executable using `gcc` 
 
 ### Calling convention
 Arguments are passed on the stack, in a similar way that is in x86 C ABI.
