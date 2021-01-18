@@ -986,17 +986,19 @@ class Emitter {
             emit_instr("ret");
         }
 
+        out << "\nsection .data\n";
+        out << "runtime_error_str: db `runtime error\\0`\n";
+        out << "print_int_fmt: db `%i\\n\\0`\n";
+        out << "read_int_fmt: db `%i\\n\\0`\n";
+        out << "section .text\n";
+
         out << '\n' << ir::builtin_error << ":\n";
         {
             emit_instr("and rsp, ", ~static_cast<uint64_t>(8)); // align rsp to 16
+            emit_instr("lea rdi, [rel runtime_error_str]");
+            emit_instr("call puts wrt ..plt");
             emit_instr("call abort wrt ..plt");
         }
-
-        out << "\nsection .data\n";
-        out << "print_int_fmt: db `%i\\n\\0`\n";
-        out << "read_int_fmt: db `%i\\n\\0`\n";
-        // out << "empty_string: db 0\n";
-        out << "section .text\n";
 
         emit_builtin_func(ir::builtin_printInt, [&] {
             emit_instr("mov esi, ", arg(0));
