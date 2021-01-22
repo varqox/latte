@@ -333,12 +333,12 @@ Expr7 : _IDENT_ { $$ = make_EVar($1); $$->line_number = @$.first_line; $$->char_
   | _STRING_ { $$ = make_ELitStr($1); $$->line_number = @$.first_line; $$->char_number = @$.first_column;  }
   | Expr7 LBracket Expr _SYMB_8 { $$ = make_EArrElem($1, $2, $3); $$->line_number = @$.first_line; $$->char_number = @$.first_column;  }
   | _IDENT_ LParen ListExpr _SYMB_1 { $$ = make_ECallFunc($1, $2, $3); $$->line_number = @$.first_line; $$->char_number = @$.first_column;  }
-  | Expr7 Dot _IDENT_ { $$ = make_EField($1, $2, $3); $$->line_number = @$.first_line; $$->char_number = @$.first_column;  }
-  | Expr7 Dot _IDENT_ LParen ListExpr _SYMB_1 { $$ = make_ECallMethod($1, $2, $3, $4, $5); $$->line_number = @$.first_line; $$->char_number = @$.first_column;  }
+  | Expr6 Dot _IDENT_ { $$ = make_EField($1, $2, $3); $$->line_number = @$.first_line; $$->char_number = @$.first_column;  }
+  | Expr6 Dot _IDENT_ LParen ListExpr _SYMB_1 { $$ = make_ECallMethod($1, $2, $3, $4, $5); $$->line_number = @$.first_line; $$->char_number = @$.first_column;  }
+  | _SYMB_36 Type _SYMB_9 Expr _SYMB_8 { $$ = make_ENewArray($2, $4); $$->line_number = @$.first_line; $$->char_number = @$.first_column;  }
   | _SYMB_0 Expr _SYMB_1 { $$ = $2; $$->line_number = @$.first_line; $$->char_number = @$.first_column;  }
 ;
-Expr6 : _SYMB_36 Type _SYMB_9 Expr _SYMB_8 { $$ = make_ENewArray($2, $4); $$->line_number = @$.first_line; $$->char_number = @$.first_column;  }
-  | _SYMB_36 _IDENT_ { $$ = make_ENewClass($2); $$->line_number = @$.first_line; $$->char_number = @$.first_column;  }
+Expr6 : _SYMB_36 _IDENT_ { $$ = make_ENewClass($2); $$->line_number = @$.first_line; $$->char_number = @$.first_column;  }
   | Expr7 { $$ = $1; $$->line_number = @$.first_line; $$->char_number = @$.first_column;  }
 ;
 Expr5 : NegOp Expr5 { $$ = make_ENeg($1, $2); $$->line_number = @$.first_line; $$->char_number = @$.first_column;  }

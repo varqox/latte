@@ -91,11 +91,11 @@ EArrElem.       Expr7 ::= Expr7 LBracket Expr "]" ;
 
 ECallFunc.      Expr7 ::= Ident LParen [Expr] ")" ;
 
-EField.         Expr7 ::= Expr7 Dot Ident ;
+EField.         Expr7 ::= Expr6 Dot Ident ;
 
-ECallMethod.    Expr7 ::= Expr7 Dot Ident LParen [Expr] ")";
+ECallMethod.    Expr7 ::= Expr6 Dot Ident LParen [Expr] ")";
 
-ENewArray.      Expr6 ::= "new" Type "[" Expr "]" ;
+ENewArray.      Expr7 ::= "new" Type "[" Expr "]" ;
 
 ENewClass.      Expr6 ::= "new" Ident ;
 
