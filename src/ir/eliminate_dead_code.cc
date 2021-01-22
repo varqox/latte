@@ -13,41 +13,36 @@ namespace ir {
 
 static std::vector<BasicBlock> eliminate_dead_blocks(std::vector<BasicBlock>&& body) {
     auto bbinfos = bblocks_pred_succ_info(body);
-    // Mark dead blocks
-    auto is_dead = [&](Label bblock_name, const BBInfo* bbi) {
-        if (not bbi) {
-            bbi = &bbinfos.at(bblock_name);
+    // Mark all blocks that are reachable from start
+    std::set<ir::Label> visited;
+    std::vector<ir::Label> stack = {body.front().name};
+    while (not stack.empty()) {
+        auto x = stack.back();
+        stack.pop_back();
+        if (not visited.emplace(x).second) {
+            continue;
         }
-        return bblock_name != body.front().name and // starting block is not dead
-            bbi->predecessors.empty();
-    };
-    std::vector<ir::Label> dead_to_mark;
-    for (auto const& [name, bbinfo] : bbinfos) {
-        if (is_dead(name, &bbinfo)) {
-            dead_to_mark.emplace_back(name);
+        for (auto y : bbinfos.at(x).successors) {
+            stack.emplace_back(y);
         }
     }
-    while (not dead_to_mark.empty()) {
-        auto bblock_name = dead_to_mark.back();
-        dead_to_mark.pop_back();
-        for (auto succ_name : bbinfos.at(bblock_name).successors) {
-            auto& succ_bbinfo = bbinfos.at(succ_name);
-            if (succ_bbinfo.predecessors.empty()) {
-                continue;
-            }
-            succ_bbinfo.predecessors.erase(bblock_name);
-            for (auto&& [var, preds] : succ_bbinfo.bblock->phis) {
-                preds.erase(bblock_name);
-            }
-            if (is_dead(succ_name, &succ_bbinfo)) {
-                dead_to_mark.emplace_back(succ_name);
+    // Remove dead nodes (as predecessors) from its successors
+    for (auto const& bblock : body) {
+        if (visited.count(bblock.name)) {
+            continue; // alive
+        }
+        // dead
+        for (auto succ_name : bbinfos.at(bblock.name).successors) {
+            // Remove dead bblock from phis of its successors
+            for (auto&& [var, preds] : bbinfos.at(succ_name).bblock->phis) {
+                preds.erase(bblock.name);
             }
         }
     }
     // Remove all dead blocks
     std::vector<BasicBlock> res;
     for (auto& bblock : body) {
-        if (not is_dead(bblock.name, nullptr)) {
+        if (visited.count(bblock.name)) {
             res.emplace_back(std::move(bblock));
         }
     }
