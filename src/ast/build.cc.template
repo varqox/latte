@@ -15,12 +15,36 @@ extern "C" {
 #include <memory>
 #include <regex>
 #include <sys/mman.h>
+#include <type_traits>
 #include <unistd.h>
+#include <utility>
 
-static inline ast::SrcLoc fixed_sloc(int line, int column) noexcept {
-    // In BNFC's AST, columns are numbered from 1 in the first line, and from 0 in other lines
-    return {.line = line, .column = (line != 1) + column};
-}
+template <class Func>
+class Defer {
+    Func func_;
+
+public:
+    // NOLINTNEXTLINE(google-explicit-constructor)
+    Defer(Func func) try
+    : func_(std::move(func))
+    {
+    } catch (...) {
+        func();
+        throw;
+    }
+
+    Defer(const Defer&) = delete;
+    Defer(Defer&&) = delete;
+    Defer& operator=(const Defer&) = delete;
+    Defer& operator=(Defer&&) = delete;
+
+    ~Defer() {
+        try {
+            func_();
+        } catch (...) {
+        }
+    }
+};
 
 namespace ast {
 
@@ -28,6 +52,22 @@ static_assert(std::is_same_v<::Integer, int_t>);
 
 struct Translator {
     frontend::ErrorPrinter& errp;
+
+    std::string translate(char* str) {
+        Defer freer{[str]{ free(str); }};
+        return str;
+    }
+
+    static constexpr ast::SrcLoc fixed_sloc(int line, int column) noexcept {
+        // In BNFC's AST, columns are numbered from 1 in the first line, and from 0 in other lines
+        return {.line = line, .column = (line != 1) + column};
+    }
+
+    template<class Node, std::enable_if_t<std::is_pointer_v<Node>, int> = 0>
+    ast::SrcLoc fixed_sloc(Node op) {
+        Defer freer{[op]{ free(op); }};
+        return fixed_sloc(op->line_number, op->char_number);
+    }
 
     TRANSLATE_TO_ENUM(AddOp, BinOp) {
         CASE(Plus, ADD) {}
@@ -58,16 +98,16 @@ struct Translator {
             .elem_type = std::make_unique<Type>(translate(x.type_)),
         }
         CASE(TClass) {
-            .name = x.ident_,
+            .name = translate(x.ident_),
         }
     }
 
     TRANSLATE(Expr) {
         CASE(EVar) {
-            .name = x.ident_,
+            .name = translate(x.ident_),
         }
         CASE(ELitInt) {
-            .str_val = x.intliteral_,
+            .str_val = translate(x.intliteral_),
         }
         CASE(ELitTrue, ELitBool) {
             .val = true,
@@ -107,89 +147,89 @@ struct Translator {
             }(),
         }
         CASE(ELitStr) {
-            .val = x.string_,
+            .val = translate(x.string_),
         }
         CASE(EArrElem) {
             .arr = std::make_unique<Expr>(translate(x.expr_1)),
             .index = std::make_unique<Expr>(translate(x.expr_2)),
             .lbracket_sloc =
-                fixed_sloc(x.lbracket_->line_number, x.lbracket_->char_number),
+                fixed_sloc(x.lbracket_),
         }
         CASE(ECallFunc) {
-            .func_name = x.ident_,
+            .func_name = translate(x.ident_),
             .args = std::make_unique<std::vector<Expr>>(translate(x.listexpr_)),
-            .lparen_sloc = fixed_sloc(x.lparen_->line_number, x.lparen_->char_number),
+            .lparen_sloc = fixed_sloc(x.lparen_),
         }
         CASE(EField) {
             .object = std::make_unique<Expr>(translate(x.expr_)),
-            .field_name = x.ident_,
-            .dot_sloc = fixed_sloc(x.dot_->line_number, x.dot_->char_number),
+            .field_name = translate(x.ident_),
+            .dot_sloc = fixed_sloc(x.dot_),
         }
         CASE(ECallMethod) {
             .object = std::make_unique<Expr>(translate(x.expr_)),
-            .method_name = x.ident_,
+            .method_name = translate(x.ident_),
             .args = std::make_unique<std::vector<Expr>>(translate(x.listexpr_)),
-            .dot_sloc = fixed_sloc(x.dot_->line_number, x.dot_->char_number),
-            .lparen_sloc = fixed_sloc(x.lparen_->line_number, x.lparen_->char_number),
+            .dot_sloc = fixed_sloc(x.dot_),
+            .lparen_sloc = fixed_sloc(x.lparen_),
         }
         CASE(ENewArray) {
             .elem_type = translate(x.type_),
             .size = std::make_unique<Expr>(translate(x.expr_)),
         }
         CASE(ENewClass) {
-            .class_name = x.ident_,
+            .class_name = translate(x.ident_),
         }
         CASE(ENeg, EUnaryOp) {
             .val = std::make_unique<Expr>(translate(x.expr_)),
             .op = UnaryOp::NEG,
-            .op_sloc = fixed_sloc(x.negop_->line_number, x.negop_->char_number),
+            .op_sloc = fixed_sloc(x.negop_),
         }
         CASE(ENot, EUnaryOp) {
             .val = std::make_unique<Expr>(translate(x.expr_)),
             .op = UnaryOp::NOT,
-            .op_sloc = fixed_sloc(x.notop_->line_number, x.notop_->char_number),
+            .op_sloc = fixed_sloc(x.notop_),
         }
         CASE(EMul, EBinOp) {
             .left = std::make_unique<Expr>(translate(x.expr_1)),
             .right = std::make_unique<Expr>(translate(x.expr_2)),
             .op = translate(x.mulop_),
-            .op_sloc = fixed_sloc(x.mulop_->line_number, x.mulop_->char_number),
+            .op_sloc = fixed_sloc(x.mulop_),
         }
         CASE(EAdd, EBinOp) {
             .left = std::make_unique<Expr>(translate(x.expr_1)),
             .right = std::make_unique<Expr>(translate(x.expr_2)),
             .op = translate(x.addop_),
-            .op_sloc = fixed_sloc(x.addop_->line_number, x.addop_->char_number),
+            .op_sloc = fixed_sloc(x.addop_),
         }
         CASE(ERel, EBinOp) {
             .left = std::make_unique<Expr>(translate(x.expr_1)),
             .right = std::make_unique<Expr>(translate(x.expr_2)),
             .op = translate(x.relop_),
-            .op_sloc = fixed_sloc(x.relop_->line_number, x.relop_->char_number),
+            .op_sloc = fixed_sloc(x.relop_),
         }
         CASE(EAnd, EBinOp) {
             .left = std::make_unique<Expr>(translate(x.expr_1)),
             .right = std::make_unique<Expr>(translate(x.expr_2)),
             .op = BinOp::AND,
-            .op_sloc = fixed_sloc(x.andop_->line_number, x.andop_->char_number),
+            .op_sloc = fixed_sloc(x.andop_),
         }
         CASE(EOr, EBinOp) {
             .left = std::make_unique<Expr>(translate(x.expr_1)),
             .right = std::make_unique<Expr>(translate(x.expr_2)),
             .op = BinOp::OR,
-            .op_sloc = fixed_sloc(x.orop_->line_number, x.orop_->char_number),
+            .op_sloc = fixed_sloc(x.orop_),
         }
     }
     TRANSLATE_LIST(Expr);
 
     TRANSLATE(DeclItem) {
         CASE(DNoInit) {
-            .name = x.ident_,
+            .name = translate(x.ident_),
         }
         CASE(DInit) {
-            .name = x.ident_,
+            .name = translate(x.ident_),
             .val = translate(x.expr_),
-            .ass_sloc = fixed_sloc(x.assop_->line_number, x.assop_->char_number),
+            .ass_sloc = fixed_sloc(x.assop_),
         }
     }
     TRANSLATE_LIST(DeclItem);
@@ -206,15 +246,15 @@ struct Translator {
         CASE(SAss) {
             .dest = translate(x.expr_1),
             .val = translate(x.expr_2),
-            .ass_sloc = fixed_sloc(x.assop_->line_number, x.assop_->char_number),
+            .ass_sloc = fixed_sloc(x.assop_),
         }
         CASE(SIncr) {
             .dest = translate(x.expr_),
-            .op_sloc = fixed_sloc(x.incrop_->line_number, x.incrop_->char_number),
+            .op_sloc = fixed_sloc(x.incrop_),
         }
         CASE(SDecr) {
             .dest = translate(x.expr_),
-            .op_sloc = fixed_sloc(x.decrop_->line_number, x.decrop_->char_number),
+            .op_sloc = fixed_sloc(x.decrop_),
         }
         CASE(SRet) {
             .val = translate(x.expr_),
@@ -229,7 +269,7 @@ struct Translator {
         }
         CASE(SFor) {
             .iter_type = translate(x.type_),
-            .iter_name = x.ident_,
+            .iter_name = translate(x.ident_),
             .arr = translate(x.expr_),
             .body = std::make_unique<Stmt>(translate(x.stmt_)),
         }
@@ -252,12 +292,12 @@ struct Translator {
 
     TRANSLATE_NO_CASE(FnArg) {
         .type = translate(x.type_),
-        .name = x.ident_,
+        .name = translate(x.ident_),
     }
     TRANSLATE_LIST(FnArg);
 
     TRANSLATE_NO_CASE(FieldDeclItem) {
-        .name = x.ident_,
+        .name = translate(x.ident_),
     }
     TRANSLATE_LIST(FieldDeclItem);
 
@@ -267,7 +307,7 @@ struct Translator {
             .names = translate(x.listfielddeclitem_),
         }
         CASE(Method) {
-            .name = x.ident_,
+            .name = translate(x.ident_),
             .ret_type = translate(x.type_),
             .args = translate(x.listfnarg_),
             .body = translate(x.block_),
@@ -277,19 +317,19 @@ struct Translator {
 
     TRANSLATE(TopDef) {
         CASE(FnDef) {
-            .name = x.ident_,
+            .name = translate(x.ident_),
             .ret_type = translate(x.type_),
             .args = translate(x.listfnarg_),
             .body = translate(x.block_),
         }
         CASE(ClassDef) {
-            .name = x.ident_,
+            .name = translate(x.ident_),
             .base_class_name = std::nullopt,
             .members = translate(x.listclassmemberdef_),
         }
         CASE(ClassDefExtends, ClassDef) {
-            .name = x.ident_1,
-            .base_class_name = x.ident_2,
+            .name = translate(x.ident_1),
+            .base_class_name = translate(x.ident_2),
             .members = translate(x.listclassmemberdef_),
         }
 
@@ -372,10 +412,24 @@ static std::string intercept_stderr(Func&& func) {
     }
 }
 
+extern "C" void Lattelex_destroy();
+
 Program build(const std::string& file_contents, frontend::ErrorPrinter& errp) {
+    FILE *f = tmpfile();
+    if (f == nullptr) {
+        fprintf(stderr, "tmpfile() == NULL\n");
+        exit(1);
+    }
+    auto fcloser = Defer{[f]{ fclose(f); }};
+    errno = 0;
+    if (fwrite(file_contents.data(), 1, file_contents.size(), f) != file_contents.size()) {
+        fprintf(stderr, "fwrite() - %s\n", strerror(errno));
+        exit(1);
+    }
+    rewind(f);
     ::Program prog;
     auto error_str = intercept_stderr([&] {
-        prog = psProgram(file_contents.data());
+        prog = pProgram(f);
     });
     if (prog) {
         return Translator{.errp = errp}.translate(prog);
@@ -400,7 +454,7 @@ Program build(const std::string& file_contents, frontend::ErrorPrinter& errp) {
         errp.error({}, error_str);
         __builtin_unreachable();
     }
-    errp.error(fixed_sloc(line, column), sm.str(3).data());
+    errp.error(Translator::fixed_sloc(line, column), sm.str(3).data());
     __builtin_unreachable();
 }
 

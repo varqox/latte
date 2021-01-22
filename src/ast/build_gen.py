@@ -20,6 +20,7 @@ def process(f, lines, line_offset, extra_indent=b'', enclosing_translate_term=No
 		term = match.group(2)
 		var = term.lower()
 		f.write(b'%b%b translate(::%b %b) {\n' % (indent, term, term, var))
+		f.write(b'%b    auto freer = Defer{[%b] { free(%b); }};\n' % (indent, var, var))
 		f.write(b'%b    %b res = {\n' % (indent, term))
 		f.write(b'%b        .val = [this, &%b]() -> decltype(%b::val) {\n' % (indent, var, term))
 		f.write(b'%b            switch (%b->kind) {\n' % (indent, var))
@@ -121,6 +122,7 @@ def process(f, lines, line_offset, extra_indent=b'', enclosing_translate_term=No
 		term = match.group(2)
 		var = term.lower()
 		f.write(b'%b%b translate(::%b %b) {\n' % (indent, term, term, var))
+		f.write(b'%b    auto freer = Defer{[%b] { free(%b); }};\n' % (indent, var, var))
 		f.write(b'%b    auto& x = %b->u.%b_;\n' % (indent, var, term.lower()))
 		f.write(b'%b    return %b{\n' % (indent, term))
 		# Find the end of TRANSLATE_NO_CASE block
@@ -151,6 +153,7 @@ def process(f, lines, line_offset, extra_indent=b'', enclosing_translate_term=No
 		f.write(b'%b    std::vector<%b> res;\n' % (indent, term))
 		f.write(b'%b    while (list) {\n' % indent)
 		f.write(b'%b        res.emplace_back(translate(list->%b_));\n' % (indent,var))
+		f.write(b'%b        auto freer = Defer{[list] { free(list); }};\n' % (indent))
 		f.write(b'%b        list = list->list%b_;\n' % (indent,var))
 		f.write(b'%b    }\n' % indent)
 		f.write(b'%b    return res;\n' % indent)

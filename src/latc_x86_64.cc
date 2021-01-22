@@ -36,7 +36,7 @@ template <
 [[noreturn]] static void fail(Arg1&& arg1, Args&&... args) {
     cerr << "\033[1;31merror: \033[0;1m" << std::forward<Arg1>(arg1);
     (cerr << ... << std::forward<Args>(args)) << "\033[m" << endl;
-    _exit(1);
+    exit(1);
 }
 
 int execute_command(
