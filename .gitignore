@@ -1,5 +1,6 @@
 *.deps
 *.o
+*.dwo
 *.sublime-project
 *.sublime-workspace
 .cache/
