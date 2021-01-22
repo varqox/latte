@@ -244,7 +244,10 @@ std::vector<BasicBlock> eliminate_redundant_gotos(std::vector<BasicBlock>&& body
         // suboptimal order, so we merge .L2 to .L1, then .L3 to .L1, not .L3 to .L2 and then
         // .L2 to .L1.
         auto curr_bbi = bbinfos.at(bblock.name);
-        if (curr_bbi.predecessors.size() == 1 and bblock.phis.empty()) {
+        if (bblock.phis.empty() and curr_bbi.predecessors.size() == 1 and
+            std::holds_alternative<IGoto>(
+                bbinfos.at(*curr_bbi.predecessors.begin()).bblock->instructions.back()))
+        {
             // This block is suitable to *BE* merged to predecessor, so we will merge it and
             // the potentially viable successor from the predecessor
             continue;
