@@ -170,7 +170,7 @@ class AstTranslator {
         cl.methods.for_each([&vtable](
                                 const ast::Ident& method_name,
                                 const ast::GlobalSymbols::Class::Method& method) {
-            vtable.methods[method.vtable_idx + 1] =
+            vtable.methods.at(method.vtable_idx + 1) =
                 fn_name_from(method.defined_in_class, method_name);
         });
     }

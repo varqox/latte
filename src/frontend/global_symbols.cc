@@ -3,7 +3,10 @@
 #include "src/frontend/error.hh"
 #include "src/overloaded.hh"
 
+#include <cassert>
+#include <cstddef>
 #include <optional>
+#include <set>
 
 namespace {
 
@@ -160,19 +163,20 @@ class GlobalSymbolsCollector {
         // Propagate methods
         auto defined_methods = cl.methods;
         auto all_methods = base_cl.methods;
-        auto base_class_vtable_size = all_methods.size();
-        defined_methods.for_each([&](const ast::Ident& name,
+        defined_methods.for_each([&](const ast::Ident& mname,
                                      const GlobalSymbols::Class::Method& method) {
-            auto vtable_idx = base_class_vtable_size + method.vtable_idx;
-            auto same_method = all_methods.find(name);
-            if (same_method) {
+            auto vtable_idx = [&] {
+                auto same_method = all_methods.find(mname);
+                if (not same_method) {
+                    return all_methods.size();
+                }
                 if (same_method->type != method.type) {
                     auto overriden_args_num = same_method->type.arg_types->size();
                     auto overriding_args_num = method.type.arg_types->size();
                     if (overriden_args_num != overriding_args_num) {
                         errp.error(
                                 method.def_sloc,
-                                "overriding method type mismatch: overridden method `", name,
+                                "overriding method type mismatch: overridden method `", mname,
                                 "` has ", overriden_args_num, " argument",
                                 &"s"[overriden_args_num == 1], ", but overriding method has ",
                                 overriding_args_num, " argument",
@@ -183,7 +187,7 @@ class GlobalSymbolsCollector {
                     } else {
                         errp.error(
                                 method.def_sloc,
-                                "overriding method type mismatch: overridden method `", name,
+                                "overriding method type mismatch: overridden method `", mname,
                                 "` has type `", as_str(same_method->type),
                                 "`, overriding method has type `", as_str(method.type), '`')
                             .note(
@@ -191,10 +195,10 @@ class GlobalSymbolsCollector {
                                 "overridden method's definition is here");
                     }
                 }
-                vtable_idx = same_method->vtable_idx;
-            }
+                return same_method->vtable_idx;
+            }();
             all_methods = all_methods.insert_or_assign(
-                name,
+                mname,
                 {
                     .defined_in_class = method.defined_in_class,
                     .vtable_idx = vtable_idx,
@@ -202,6 +206,16 @@ class GlobalSymbolsCollector {
                     .def_sloc = method.def_sloc,
                 });
         });
+        std::set<size_t> vtable_idxs;
+        all_methods.for_each(
+            [&vtable_idxs](
+                const ast::Ident& /*mname*/, const GlobalSymbols::Class::Method& method) {
+                auto [_, inserted] = vtable_idxs.emplace(method.vtable_idx);
+                assert(inserted);
+            });
+        assert(vtable_idxs.size() == all_methods.size());
+        assert(vtable_idxs.empty() or *vtable_idxs.begin() == 0);
+        assert(vtable_idxs.empty() or *vtable_idxs.rbegin() == all_methods.size() - 1);
         cl.methods = std::move(all_methods);
     }
 
