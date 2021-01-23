@@ -4,7 +4,8 @@
 - arrays
 - classes with inheritance and virtual methods
 - null implicitly converts to any array and to any class
-- destructors (garbage collection); can be disabled -- see [Compiler flags](#c-flags).
+- destructors (garbage collection) for every non-trivial type; can be disabled -- see [Compiler flags](#c-flags).
+- making IR SSA
 - optimizations:
     - constant propagation
     - copy propagation
@@ -92,7 +93,7 @@ Compiler backend is x86_64 in Intel flavor (NASM is used for assembly). So far i
 Compilation of assembly is done in three steps:
 - running `NASM` to compile assembly into an object file (`*.o`)
 - stripping local symbols using `strip` because `NASM` always puts local labels into the symbol table which is totally unnecessary
-- linking object file into executable using `gcc` 
+- linking object file into executable using `gcc`
 
 ### Calling convention
 Arguments are passed on the stack, in a similar way that is in x86 C ABI.
