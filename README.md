@@ -50,6 +50,10 @@ Just use
 ```
 make
 ```
+*In case of compiler crashes please try:*
+```
+make DEBUG=8
+```
 
 ## Used tools
 Project is implemented in C++17. For parsing BNFC with C backend was used.
